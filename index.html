@@ -1,0 +1,2045 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>今日作业打卡</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  /* ============================================================
+     CSS 变量 — 软萌手绘风配色体系
+     ============================================================ */
+  :root {
+    --paper:       #fdf6ee;
+    --paper-dark:  #f5ead8;
+    --ink:         #4a3f35;
+    --ink-light:   #9b8c7c;
+    --ink-faint:   #d4c8b8;
+
+    /* 科目 — 柔和粉彩 */
+    --chinese:     #fce4e4;
+    --chinese-ink: #c97a7a;
+    --math:        #e4ecfd;
+    --math-ink:    #6b8ac9;
+    --english:     #e4faf0;
+    --english-ink: #5ea882;
+    --science:     #f0e8fa;
+    --science-ink: #8b6eb8;
+    --other:       #fdf0e0;
+    --other-ink:   #c99a6b;
+
+    /* 状态 */
+    --active:      #ffb380;
+    --active-glow: rgba(255,179,128,0.3);
+    --done:        #7cc9a0;
+    --done-star:   #f5c842;
+    --danger:      #e08888;
+
+    /* 纸胶带 */
+    --tape-pink:   rgba(255,210,210,0.55);
+    --tape-blue:   rgba(200,220,255,0.5);
+    --tape-mint:   rgba(200,240,220,0.5);
+    --tape-yellow: rgba(255,240,200,0.55);
+
+    /* 休息 */
+    --rest-bg:     #fdf2f8;
+    --rest-accent: #e8a0c0;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ============================================================
+     纸面背景 + 圆点网格
+     ============================================================ */
+  body {
+    font-family: "ZCOOL KuaiLe", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background-color: var(--paper);
+    background-image: radial-gradient(circle, var(--ink-faint) 1px, transparent 1px);
+    background-size: 24px 24px;
+    min-height: 100dvh;
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 20px 14px 40px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 430px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* ============================================================
+     头部 — 手绘标题
+     ============================================================ */
+  .header {
+    text-align: center;
+    padding: 10px 0 0;
+    position: relative;
+  }
+  .header h1 {
+    font-family: "ZCOOL KuaiLe", cursive;
+    font-size: 30px;
+    font-weight: 400;
+    color: var(--ink);
+    display: inline-block;
+    position: relative;
+    letter-spacing: 2px;
+  }
+  .header h1::after {
+    content: '';
+    position: absolute;
+    left: -8%; bottom: -6px;
+    width: 116%;
+    height: 8px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 8'%3E%3Cpath d='M0 6 Q5 0 10 6 Q15 12 20 6 Q25 0 30 6 Q35 12 40 6 Q45 0 50 6 Q55 12 60 6 Q65 0 70 6 Q75 12 80 6 Q85 0 90 6 Q95 12 100 6 Q105 0 110 6 Q115 12 120 6' fill='none' stroke='%23f0b888' stroke-width='2'/%3E%3C/svg%3E") repeat-x;
+    background-size: 120px 8px;
+  }
+  .header .date {
+    font-size: 13px;
+    color: var(--ink-light);
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+
+  .doodle-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    font-size: 18px;
+    opacity: 0.5;
+    pointer-events: none;
+    margin-top: -4px;
+  }
+
+  .version-footer {
+    text-align: center;
+    font-size: 10px;
+    color: var(--ink-faint);
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* ============================================================
+     添加表单 — 手撕纸片风格
+     ============================================================ */
+  .add-card {
+    background: var(--paper-dark);
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 18px 16px 14px;
+    position: relative;
+    box-shadow:
+      2px 3px 0 -1px #e8dcc8,
+      4px 5px 0 -1px rgba(0,0,0,0.04);
+    transform: rotate(-0.3deg);
+  }
+  .add-card::before {
+    content: '';
+    position: absolute;
+    top: -10px; left: 50%;
+    transform: translateX(-50%) rotate(-2deg);
+    width: 56px; height: 22px;
+    background: var(--tape-pink);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .add-card .row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .add-card select,
+  .add-card input {
+    font-family: inherit;
+    font-size: 15px;
+    border: 2px dashed var(--ink-faint);
+    border-radius: 20px 8px 20px 8px;
+    padding: 10px 14px;
+    background: #fffef9;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .add-card select:focus,
+  .add-card input:focus {
+    border-color: #c9a87c;
+    border-style: solid;
+  }
+  .add-card select {
+    flex: 0 0 auto;
+    width: 84px;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%239b8c7c' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+    cursor: pointer;
+  }
+  .add-card input {
+    flex: 1; min-width: 0;
+  }
+  .btn-add {
+    width: 100%;
+    padding: 12px;
+    border: 2.5px solid #e8c8a0;
+    border-radius: 24px 8px 24px 8px;
+    background: #fffef9;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+    min-height: 46px;
+    position: relative;
+  }
+  .btn-add:active {
+    background: #fff3e0;
+    transform: scale(0.96);
+    border-color: #d4a878;
+  }
+  .btn-add::after {
+    content: '✦';
+    position: absolute;
+    right: 16px; top: 50%;
+    transform: translateY(-55%);
+    font-size: 12px;
+    color: #e0c090;
+    animation: twinkle 2s ease-in-out infinite;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.3; transform: translateY(-55%) scale(0.8); }
+    50%      { opacity: 1;   transform: translateY(-55%) scale(1.2); }
+  }
+
+  /* ============================================================
+     预计总用时汇总条
+     ============================================================ */
+  .summary-bar {
+    background: #fffef9;
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow:
+      2px 3px 0 -1px #e8dcc8,
+      4px 5px 0 -1px rgba(0,0,0,0.04);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    display: none;
+  }
+  .summary-bar .clock-icon { font-size: 20px; }
+  .summary-bar { flex-wrap: wrap; }
+  .summary-bar .total-minutes { color: #e08850; font-size: 18px; }
+  .summary-bar .summary-divider { width: 100%; height: 0; flex-basis: 100%; }
+  .summary-actual {
+    width: 100%;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink-light);
+    letter-spacing: 1px;
+    display: none;
+  }
+  .summary-actual.show { display: block; }
+  .summary-actual .actual-time { color: var(--done); font-weight: 700; font-size: 16px; }
+
+  /* ============================================================
+     空状态
+     ============================================================ */
+  .empty-hint {
+    text-align: center;
+    color: var(--ink-light);
+    font-size: 15px;
+    padding: 40px 0;
+    letter-spacing: 1px;
+  }
+  .empty-hint .big-doodle {
+    display: block;
+    font-size: 48px;
+    margin-bottom: 8px;
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-10px); }
+  }
+
+  /* ============================================================
+     作业卡片列表
+     ============================================================ */
+  .task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* 锁定状态 */
+  .task-list.locked {
+    pointer-events: none;
+    opacity: 0.45;
+    filter: grayscale(0.2) blur(0.5px);
+    transition: opacity 0.3s, filter 0.3s;
+  }
+
+  /* 卡片基础 — 手撕纸片 */
+  .task-card {
+    background: #fffef9;
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 14px 14px 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    box-shadow:
+      2px 3px 0 -1px #e8dcc8,
+      4px 5px 0 -1px rgba(0,0,0,0.04);
+    transition: transform 0.2s, box-shadow 0.2s, background 0.3s;
+    animation: card-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    flex-wrap: wrap;
+  }
+  .task-card:nth-child(odd)  { transform: rotate(-0.4deg); }
+  .task-card:nth-child(even) { transform: rotate(0.3deg); }
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.92); }
+  }
+
+  /* 卡片主行 */
+  .task-card .card-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  /* 卡片底栏：预估时间 + 调整 */
+  .task-card .card-extra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 100%;
+    padding-left: 56px;
+    padding-right: 4px;
+    font-size: 12px;
+    color: var(--ink-light);
+    justify-content: space-between;
+  }
+
+  /* --- 纸胶带 --- */
+  .task-card .tape {
+    position: absolute;
+    top: -11px;
+    width: 44px; height: 20px;
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    z-index: 1;
+  }
+  .task-card:nth-child(3n+1) .tape { left: 20px;  background: var(--tape-pink);   transform: rotate(-3deg); }
+  .task-card:nth-child(3n+2) .tape { right: 20px; background: var(--tape-blue);   transform: rotate(2deg);  }
+  .task-card:nth-child(3n+3) .tape { left: 50%;   background: var(--tape-mint);   transform: translateX(-50%) rotate(-1deg); }
+
+  /* --- 状态颜色 --- */
+  .task-card[data-status="pending"] { background: #fffef9; }
+  .task-card[data-status="active"] {
+    background: #fff8f0;
+    box-shadow:
+      2px 3px 0 -1px #f0d0b0,
+      0 0 0 6px var(--active-glow),
+      0 0 20px rgba(255,179,128,0.12);
+    animation: card-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards, heartbeat 2s ease-in-out infinite;
+  }
+  @keyframes heartbeat {
+    0%, 100% { box-shadow: 2px 3px 0 -1px #f0d0b0, 0 0 0 6px var(--active-glow), 0 0 20px rgba(255,179,128,0.12); }
+    15%      { box-shadow: 2px 3px 0 -1px #f0d0b0, 0 0 0 14px rgba(255,179,128,0), 0 0 30px rgba(255,179,128,0.05); }
+  }
+  .task-card[data-status="done"] {
+    background: #f8fdf6;
+    box-shadow:
+      2px 3px 0 -1px #c8e0cc,
+      4px 5px 0 -1px rgba(0,0,0,0.03);
+  }
+
+  /* --- 科目小标签 --- */
+  .task-subject-tag {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px 4px 12px 4px;
+    letter-spacing: 1px;
+    border: 1.5px dashed transparent;
+    min-width: 42px;
+    text-align: center;
+  }
+  .task-card[data-subject="语文"] .task-subject-tag { background: var(--chinese); color: var(--chinese-ink); border-color: #ecc; }
+  .task-card[data-subject="数学"] .task-subject-tag { background: var(--math);    color: var(--math-ink);    border-color: #ccd; }
+  .task-card[data-subject="英语"] .task-subject-tag { background: var(--english);  color: var(--english-ink); border-color: #cec; }
+  .task-card[data-subject="科学"] .task-subject-tag { background: var(--science);  color: var(--science-ink); border-color: #dcd; }
+  .task-card[data-subject="其他"] .task-subject-tag { background: var(--other);    color: var(--other-ink);   border-color: #edc; }
+
+  /* --- 内容 --- */
+  .task-content {
+    flex: 1; min-width: 0;
+    font-size: 15px;
+    font-weight: 700;
+    word-break: break-all;
+    transition: color 0.3s, text-decoration 0.3s;
+    letter-spacing: 0.5px;
+  }
+  .task-card[data-status="done"] .task-content {
+    color: var(--ink-light);
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+    text-decoration-color: #c8d8c0;
+  }
+
+  /* --- 计时器 --- */
+  .task-timer {
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 40px;
+    text-align: center;
+    color: var(--ink-light);
+    letter-spacing: 0.5px;
+  }
+  .task-card[data-status="active"] .task-timer {
+    color: #e08850;
+    font-size: 17px;
+    animation: timer-tick 1s step-end infinite;
+  }
+  @keyframes timer-tick { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .task-card[data-status="done"] .task-timer { color: var(--done); }
+
+  /* --- 预计时间行 --- */
+  .est-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-light);
+    white-space: nowrap;
+  }
+  .est-row .est-icon { font-size: 13px; }
+  .est-row .est-val { font-weight: 700; color: #b09070; min-width: 42px; text-align: center; }
+
+  .btn-est {
+    width: 24px; height: 24px;
+    border: 1.5px dashed var(--ink-faint);
+    border-radius: 50%;
+    background: #fffef9;
+    color: var(--ink-light);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    transition: all 0.12s;
+    padding: 0;
+    touch-action: manipulation;
+  }
+  .btn-est:active { background: #fef0e0; border-color: #c9a87c; color: var(--ink); }
+  .btn-est:disabled { opacity: 0.3; pointer-events: none; }
+
+  /* 底栏暂停/继续文字按钮 */
+  .btn-extra-action {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1.5px dashed var(--ink-faint);
+    border-radius: 10px 3px 10px 3px;
+    background: #fffef9;
+    color: var(--ink-light);
+    cursor: pointer;
+    padding: 3px 10px;
+    letter-spacing: 0.5px;
+    transition: all 0.12s;
+    touch-action: manipulation;
+    white-space: nowrap;
+  }
+  /* --- 操作按钮 --- */
+  .task-action {
+    flex-shrink: 0;
+    min-width: 46px; min-height: 46px;
+    border-radius: 50%;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .task-action:active { transform: scale(0.88); }
+
+  .btn-start {
+    border: 2.5px solid #f0c090;
+    background: #fff8f0;
+    color: #e08850;
+    border-radius: 50%;
+    width: 46px; height: 46px;
+    padding: 0;
+  }
+  .btn-start::before { content: '▶'; font-size: 11px; }
+
+  .btn-finish {
+    border: 2.5px solid #a0d8b8;
+    background: #f4fdf6;
+    color: #5ea870;
+    border-radius: 50%;
+    width: 46px; height: 46px;
+    padding: 0;
+    animation: ready-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes ready-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(126,200,160,0.35); }
+    50%      { box-shadow: 0 0 0 8px rgba(126,200,160,0); }
+  }
+
+  /* --- 完成标记：手绘星星 --- */
+  .task-done-mark {
+    flex-shrink: 0;
+    width: 46px; height: 46px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    animation: pop-star 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  }
+  @keyframes pop-star { from{transform:scale(0)rotate(-30deg)} to{transform:scale(1)rotate(0deg)} }
+  .task-done-mark .star-body {
+    display: inline-block;
+    animation: star-glow 2s ease-in-out infinite;
+  }
+  @keyframes star-glow {
+    0%,100%{filter:drop-shadow(0 0 2px #f5c842)} 50%{filter:drop-shadow(0 0 8px #f5c842)}
+  }
+
+  /* --- 删除小叉 --- */
+  .btn-delete {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border: 1.5px dashed transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: #c8b8a8;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+    transition: all 0.15s;
+    margin-left: -6px;
+    margin-right: -4px;
+    touch-action: manipulation;
+  }
+  .btn-delete:active { color: var(--danger); background: #fff0f0; border-color: #f0d0d0; }
+
+  /* ============================================================
+     底部进度 — 手绘风格
+     ============================================================ */
+  .progress-card {
+    background: #fffef9;
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow:
+      2px 3px 0 -1px #e8dcc8,
+      4px 5px 0 -1px rgba(0,0,0,0.04);
+  }
+  .progress-bar-outer {
+    flex: 1; height: 12px;
+    background: var(--paper-dark);
+    border-radius: 6px;
+    border: 1.5px dashed var(--ink-faint);
+    overflow: hidden;
+  }
+  .progress-bar-inner {
+    height: 100%;
+    background: repeating-linear-gradient(45deg, #a0d8b8, #a0d8b8 4px, #8ccca8 4px, #8ccca8 8px);
+    border-radius: 5px;
+    transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .progress-bar-inner.all-done {
+    background: repeating-linear-gradient(45deg, #f5c842, #f5c842 4px, #f0b830 4px, #f0b830 8px);
+  }
+  .progress-text {
+    font-size: 14px; font-weight: 700;
+    color: var(--ink-light);
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+
+  /* ============================================================
+     Toast — 手绘气泡
+     ============================================================ */
+  .toast {
+    position: fixed;
+    top: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: #fffef9;
+    color: var(--ink);
+    padding: 10px 22px;
+    border-radius: 20px 6px 20px 6px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+    border: 2px dashed var(--ink-faint);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .toast.show { opacity: 1; }
+
+  /* ============================================================
+     休息弹窗
+     ============================================================ */
+  .rest-overlay {
+    position: fixed; inset: 0;
+    background: rgba(74,63,53,0.35);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 500;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .rest-overlay.show { display: flex; }
+
+  .rest-card {
+    background: var(--rest-bg);
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 32px 28px 24px;
+    text-align: center;
+    box-shadow:
+      2px 4px 0 -1px #e8d0d8,
+      0 8px 32px rgba(0,0,0,0.12);
+    max-width: 320px;
+    width: 88%;
+    position: relative;
+    animation: rest-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes rest-pop { from{transform:scale(0.85);opacity:0} to{transform:scale(1);opacity:1} }
+
+  /* 纸胶带 */
+  .rest-card::before {
+    content: '';
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%) rotate(-2deg);
+    width: 60px; height: 24px;
+    background: var(--tape-yellow);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  .rest-card .rest-emoji {
+    font-size: 52px;
+    display: block;
+    margin-bottom: 8px;
+    animation: float 3s ease-in-out infinite;
+  }
+  .rest-card .rest-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .rest-card .rest-sub {
+    font-size: 12px;
+    color: var(--rest-accent);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+    min-height: 18px;
+  }
+  .rest-card .rest-elapsed {
+    font-size: 13px;
+    color: var(--done);
+    font-weight: 700;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+    min-height: 18px;
+  }
+  .rest-card .rest-countdown {
+    font-size: 56px;
+    font-weight: 700;
+    color: #e08888;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 20px;
+    line-height: 1;
+  }
+  .rest-card .rest-progress {
+    width: 100%; height: 8px;
+    background: #f0d8e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .rest-card .rest-progress-fill {
+    height: 100%;
+    background: repeating-linear-gradient(45deg, #e8a0c0, #e8a0c0 3px, #f0b8d0 3px, #f0b8d0 6px);
+    border-radius: 4px;
+    transition: width 0.95s linear;
+  }
+  .btn-skip {
+    border: 2px dashed #e8c0d0;
+    border-radius: 24px 8px 24px 8px;
+    background: #fffafc;
+    color: var(--ink-light);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 28px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+  .btn-skip:active { background: #fff0f4; border-color: #e0a0b8; color: var(--ink); }
+
+  /* ============================================================
+     闹钟提醒弹窗
+     ============================================================ */
+  .alarm-overlay {
+    position: fixed; inset: 0;
+    background: rgba(74,63,53,0.4);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 650;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .alarm-overlay.show { display: flex; }
+
+  .alarm-card {
+    background: #fff8f0;
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 32px 28px 24px;
+    text-align: center;
+    box-shadow:
+      2px 4px 0 -1px #f0d0b0,
+      0 0 0 8px rgba(255,179,128,0.15),
+      0 8px 32px rgba(0,0,0,0.14);
+    max-width: 300px;
+    width: 88%;
+    position: relative;
+    animation: alarm-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes alarm-pop {
+    from { transform: scale(0.7); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  .alarm-icon {
+    display: block;
+    font-size: 56px;
+    animation: alarm-ring 0.6s ease-in-out infinite;
+    margin-bottom: 8px;
+  }
+  @keyframes alarm-ring {
+    0%, 100% { transform: rotate(0deg); }
+    10%      { transform: rotate(-15deg); }
+    20%      { transform: rotate(13deg); }
+    30%      { transform: rotate(-10deg); }
+    40%      { transform: rotate(8deg); }
+    50%      { transform: rotate(-5deg); }
+    60%      { transform: rotate(3deg); }
+    70%      { transform: rotate(0deg); }
+  }
+
+  .alarm-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .alarm-sub {
+    font-size: 13px;
+    color: var(--ink-light);
+    margin-bottom: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-alarm-dismiss {
+    border: 2.5px solid #e08850;
+    border-radius: 24px 8px 24px 8px;
+    background: #fff8f0;
+    color: #e08850;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 10px 36px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all 0.15s;
+    animation: alarm-btn-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes alarm-btn-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(224,136,80,0.4); }
+    50%      { box-shadow: 0 0 0 10px rgba(224,136,80,0); }
+  }
+  .btn-alarm-dismiss:active { background: #fff0e0; transform: scale(0.94); }
+
+  /* ============================================================
+     彩纸庆祝 — 手绘碎纸片
+     ============================================================ */
+  .confetti-overlay {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 100;
+    display: none;
+  }
+  .confetti-overlay.show { display: block; }
+  .confetti-piece {
+    position: absolute;
+    animation: confetti-fall 2s ease-out forwards;
+  }
+  @keyframes confetti-fall {
+    0%   { transform: translateY(-60px) rotate(0deg) scale(1); opacity: 1; }
+    100% { transform: translateY(105vh) rotate(900deg) scale(0.2); opacity: 0; }
+  }
+
+  /* ============================================================
+     完成报告弹窗
+     ============================================================ */
+  .report-overlay {
+    position: fixed; inset: 0;
+    background: rgba(74,63,53,0.4);
+    display: none;
+    align-items: flex-start; justify-content: center;
+    z-index: 600;
+    overflow-y: auto;
+    padding: 20px 12px 40px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .report-overlay.show { display: flex; }
+
+  .report-card {
+    background: #fffef9;
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 28px 18px 20px;
+    box-shadow:
+      3px 4px 0 -1px #e8dcc8,
+      0 8px 32px rgba(0,0,0,0.14);
+    max-width: 400px;
+    width: 100%;
+    position: relative;
+    animation: rest-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .report-card::before {
+    content: '';
+    position: absolute;
+    top: -13px; left: 50%;
+    transform: translateX(-50%) rotate(-2deg);
+    width: 64px; height: 26px;
+    background: var(--tape-yellow);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  .report-header {
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  .report-header h2 {
+    font-family: "ZCOOL KuaiLe", cursive;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--ink);
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+  .report-header .report-date {
+    font-size: 12px;
+    color: var(--ink-light);
+    letter-spacing: 1px;
+  }
+
+  /* 文字统计 */
+  .report-stats {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .report-stat-item {
+    text-align: center;
+    background: var(--paper-dark);
+    border-radius: 16px 4px 16px 4px;
+    padding: 10px 16px;
+    min-width: 70px;
+    border: 1.5px dashed var(--ink-faint);
+  }
+  .report-stat-item .stat-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: #e08850;
+    display: block;
+  }
+  .report-stat-item .stat-label {
+    font-size: 11px;
+    color: var(--ink-light);
+    letter-spacing: 0.5px;
+  }
+  .report-stat-item.rate .stat-num { color: var(--done); }
+
+  /* 作业明细 */
+  .report-detail {
+    margin-bottom: 14px;
+  }
+  .report-detail h3 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    color: var(--ink);
+  }
+  .report-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .report-detail-table th,
+  .report-detail-table td {
+    padding: 7px 5px;
+    text-align: center;
+    border-bottom: 1px dashed var(--ink-faint);
+    letter-spacing: 0.5px;
+  }
+  .report-detail-table th {
+    font-weight: 700;
+    color: var(--ink-light);
+    font-size: 11px;
+  }
+  .report-detail-table .td-subject {
+    font-weight: 700;
+    font-size: 11px;
+  }
+  .report-detail-table .td-status-on-time  { color: var(--done); }
+  .report-detail-table .td-status-over    { color: var(--danger); }
+  .report-detail-table .td-status-ahead   { color: #6090c0; }
+
+  /* 图表区 */
+  .report-charts {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .report-chart-box {
+    background: #fdfcf8;
+    border-radius: 16px;
+    border: 1.5px dashed var(--ink-faint);
+    padding: 12px;
+    position: relative;
+  }
+  .report-chart-box h4 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-align: center;
+    margin-bottom: 8px;
+    color: var(--ink-light);
+  }
+  .report-chart-box canvas {
+    max-height: 220px;
+  }
+
+  /* 报告按钮 */
+  .report-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .report-actions button {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 20px 6px 20px 6px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-close-report {
+    border: 2px dashed var(--ink-faint);
+    background: #fffef9;
+    color: var(--ink-light);
+  }
+  .btn-new-round {
+    border: 2.5px solid #f0c090;
+    background: #fff8f0;
+    color: #e08850;
+  }
+  .report-actions button:active { transform: scale(0.95); }
+
+  /* ============================================================
+     响应式适配
+     ============================================================ */
+
+  /* 平板及以上：放宽宽度 */
+  @media (min-width: 600px) {
+    .app { max-width: 560px; }
+    .report-card { max-width: 520px; }
+    .report-chart-box canvas { max-height: 280px; }
+    .task-content { font-size: 16px; }
+  }
+
+  /* 大屏平板 / 桌面 */
+  @media (min-width: 900px) {
+    .app { max-width: 640px; gap: 22px; }
+    .report-card { max-width: 600px; }
+    .report-chart-box canvas { max-height: 320px; }
+    .header h1 { font-size: 34px; }
+  }
+
+  /* 小屏手机 (≤374px)：压缩内边距 */
+  @media (max-width: 374px) {
+    body { padding: 12px 8px 32px; }
+    .app { gap: 12px; }
+    .task-card { padding: 12px 10px 12px 14px; }
+    .task-card .card-main { gap: 6px; }
+    .task-subject-tag { font-size: 10px; padding: 3px 7px; min-width: 36px; }
+    .task-content { font-size: 14px; }
+    .task-timer { font-size: 13px; min-width: 34px; }
+    .task-action { min-width: 40px; min-height: 40px; }
+    .btn-start, .btn-finish { width: 40px; height: 40px; }
+    .task-card .card-extra { padding-left: 44px; font-size: 11px; }
+    .add-card { padding: 14px 12px 10px; }
+    .add-card select { width: 72px; font-size: 14px; }
+    .add-card input { font-size: 14px; }
+    .report-card { padding: 22px 12px 16px; }
+    .report-detail-table { font-size: 11px; }
+    .report-detail-table th, .report-detail-table td { padding: 5px 3px; }
+    .report-stat-item { padding: 8px 12px; min-width: 60px; }
+    .report-stat-item .stat-num { font-size: 18px; }
+  }
+
+  /* 报告表格横向滚动（所有尺寸） */
+  .report-detail {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .report-detail-table {
+    min-width: 340px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ====== 头部 ====== -->
+  <div class="header">
+    <h1>今日作业打卡</h1>
+    <div class="date" id="headerDate"></div>
+  </div>
+  <div class="doodle-row">✿ ⁕ ✦ ⁕ ✿</div>
+
+  <!-- ====== 添加表单 ====== -->
+  <div class="add-card">
+    <div class="row">
+      <select id="subjectSelect">
+        <option value="语文">语文</option>
+        <option value="数学">数学</option>
+        <option value="英语">英语</option>
+        <option value="科学">科学</option>
+        <option value="其他">其他</option>
+      </select>
+      <input type="text" id="contentInput" placeholder="写作业内容..." maxlength="40" autocomplete="off">
+    </div>
+    <button class="btn-add" id="btnAdd" onclick="Actions.addTask()">＋ 添加作业</button>
+  </div>
+
+  <!-- ====== 预计总用时 ====== -->
+  <div class="summary-bar" id="summaryBar">
+    <span class="clock-icon">⏱</span>
+    <span>预计总用时</span>
+    <span class="total-minutes" id="totalMinutes">0 分钟</span>
+    <div class="summary-divider"></div>
+    <div class="summary-actual" id="summaryActual">
+      实际用时 <span class="actual-time" id="actualTime">0 分钟</span>
+    </div>
+  </div>
+
+  <!-- ====== 作业列表 ====== -->
+  <div class="task-list" id="taskList">
+    <div class="empty-hint">
+      <span class="big-doodle">📝</span>
+      还没有作业，快添加吧
+    </div>
+  </div>
+
+  <!-- ====== 底部进度 ====== -->
+  <div class="progress-card" id="progressCard" style="display:none">
+    <div class="progress-bar-outer">
+      <div class="progress-bar-inner" id="progressBar" style="width:0%"></div>
+    </div>
+    <div class="progress-text" id="progressText">0/0</div>
+  </div>
+
+  <div class="doodle-row">⁕ ✦ ⁕ ✿ ⁕</div>
+  <div class="version-footer">V26.5.3</div>
+</div>
+
+<!-- ====== Toast ====== -->
+<div class="toast" id="toast"></div>
+
+<!-- ====== 休息弹窗 ====== -->
+<div class="rest-overlay" id="restOverlay">
+  <div class="rest-card">
+    <span class="rest-emoji">☕</span>
+    <div class="rest-title" id="restTitle">休息一下～</div>
+    <div class="rest-sub" id="restSub"></div>
+    <div class="rest-elapsed" id="restElapsed"></div>
+    <div class="rest-countdown" id="restCountdown">5:00</div>
+    <div class="rest-progress">
+      <div class="rest-progress-fill" id="restProgressFill" style="width:0%"></div>
+    </div>
+    <button class="btn-skip" onclick="Actions.skipRest()">跳过休息 ▶▶</button>
+  </div>
+</div>
+
+<!-- ====== 闹钟提醒弹窗 ====== -->
+<div class="alarm-overlay" id="alarmOverlay">
+  <div class="alarm-card">
+    <span class="alarm-icon">🔔</span>
+    <div class="alarm-title">休息时间结束！</div>
+    <div class="alarm-sub">该继续做作业啦～</div>
+    <button class="btn-alarm-dismiss" onclick="dismissAlarm()">确 定</button>
+  </div>
+</div>
+
+<!-- ====== 彩纸层 ====== -->
+<div class="confetti-overlay" id="confetti"></div>
+
+<!-- ====== 完成报告弹窗 ====== -->
+<div class="report-overlay" id="reportOverlay">
+  <div class="report-card">
+    <div class="report-header">
+      <h2>🎉 今日学习报告</h2>
+      <div class="report-date" id="reportDate"></div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="report-stats">
+      <div class="report-stat-item">
+        <span class="stat-num" id="statTasks">0</span>
+        <span class="stat-label">总作业数</span>
+      </div>
+      <div class="report-stat-item">
+        <span class="stat-num" id="statActual">0分</span>
+        <span class="stat-label">总实际用时</span>
+      </div>
+      <div class="report-stat-item">
+        <span class="stat-num" id="statRest">0分</span>
+        <span class="stat-label">总休息时间</span>
+      </div>
+      <div class="report-stat-item rate">
+        <span class="stat-num" id="statOnTime">0%</span>
+        <span class="stat-label">按时完成率</span>
+      </div>
+    </div>
+
+    <!-- 作业明细表 -->
+    <div class="report-detail">
+      <h3>📋 作业明细</h3>
+      <table class="report-detail-table">
+        <thead>
+          <tr><th>科目</th><th>内容</th><th>预计</th><th>实际</th><th>剩余/超时</th></tr>
+        </thead>
+        <tbody id="reportTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 图表 -->
+    <div class="report-charts">
+      <div class="report-chart-box">
+        <h4>各科目用时占比</h4>
+        <canvas id="chartPie"></canvas>
+      </div>
+      <div class="report-chart-box">
+        <h4>预计 vs 实际用时对比</h4>
+        <canvas id="chartBar"></canvas>
+      </div>
+    </div>
+
+    <!-- 操作 -->
+    <div class="report-actions">
+      <button class="btn-close-report" onclick="closeReport()">关闭报告</button>
+      <button class="btn-new-round" onclick="Actions.startNewRound()">开始新一轮 ✨</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==================================================================
+   AppState — 唯一状态对象
+   ================================================================== */
+const AppState = {
+  date: getTodayStr(),
+  tasks: [],
+  activeTaskId: null,
+  timerIntervalId: null,
+  timerStartAt: null,
+
+  /* --- 休息状态 --- */
+  isResting: false,
+  restSeconds: 0,
+  restTotal: 0,
+  restIntervalId: null,
+  _restStartedAt: null,
+  restSubjectLabel: '',
+  totalRestSeconds: 0,     // 累计休息秒数（用于报告）
+
+  /* 自动预估（字符数 → 分钟） */
+  estimateMinutes(content) {
+    const len = content.replace(/\s/g, '').length;
+    if (len <= 5)  return 8;
+    if (len <= 15) return 15;
+    return 25;
+  },
+
+  /* 总预计时间 */
+  totalEstimate() {
+    return this.tasks.reduce((s, t) => s + (t.estimatedMinutes || 0), 0);
+  },
+
+  /* 总实际用时（已完成任务 elapsed 秒数之和，转为分钟） */
+  totalActualMinutes() {
+    const totalSec = this.tasks
+      .filter(t => t.status === 'done')
+      .reduce((s, t) => s + (t.elapsed || 0), 0);
+    return Math.round(totalSec / 60);
+  },
+
+  save() {
+    const payload = {
+      date: this.date,
+      tasks: this.tasks.map(t => ({
+        id: t.id, subject: t.subject, content: t.content,
+        status: (t.status === 'active') ? 'pending' : t.status,
+        elapsed: (t.status === 'active') ? 0 : t.elapsed,
+        estimatedMinutes: t.estimatedMinutes,
+      })),
+      totalRestSeconds: this.totalRestSeconds,
+    };
+    localStorage.setItem('hw_checkin_v2', JSON.stringify(payload));
+  },
+
+  load() {
+    try {
+      const raw = localStorage.getItem('hw_checkin_v2');
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      if (obj.date === getTodayStr()) {
+        this.tasks = obj.tasks;
+        this.totalRestSeconds = obj.totalRestSeconds || 0;
+      }
+    } catch { /* ignore */ }
+    this.activeTaskId = null;
+    this.timerIntervalId = null;
+    this.timerStartAt = null;
+    this.isResting = false;
+    this.restSeconds = 0;
+    this.restTotal = 0;
+    this.restIntervalId = null;
+    this._restStartedAt = null;
+  },
+};
+
+/* ==================================================================
+   Helpers
+   ================================================================== */
+let _nextId = Date.now();
+function uid() { return 't' + (_nextId++).toString(36); }
+
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function formatDate() {
+  const d = new Date();
+  const week = ['日','一','二','三','四','五','六'][d.getDay()];
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 星期${week}`;
+}
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function fmtMinutes(min) {
+  if (min < 60) return `${min} 分钟`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h} 小时 ${m} 分钟` : `${h} 小时`;
+}
+
+/* ==================================================================
+   Toast
+   ================================================================== */
+let _tt = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (_tt) clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ==================================================================
+   Web Audio API — 音效（共享 AudioContext，移动端防挂起）
+   ================================================================== */
+let _audioCtx = null;
+let _pendingBeep = false;  // 锁屏期间 beep 未能播放，等用户交互后补播
+
+async function _ensureAudioCtx() {
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') {
+    try { await _audioCtx.resume(); } catch { /* 静默 */ }
+  }
+  return _audioCtx;
+}
+
+function _makeTone(ctx, freq, start, dur, vol, type) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur);
+}
+
+function _scheduleBeep(ctx) {
+  const now = ctx.currentTime;
+  _makeTone(ctx, 880,  now,       0.15, 0.28, 'sine');
+  _makeTone(ctx, 1100, now + 0.18, 0.15, 0.28, 'sine');
+  _makeTone(ctx, 1320, now + 0.36, 0.30, 0.28, 'sine');
+}
+
+function _scheduleDoneBeep(ctx) {
+  const now = ctx.currentTime;
+  _makeTone(ctx, 660, now,       0.12, 0.22, 'sine');
+  _makeTone(ctx, 880, now + 0.12, 0.25, 0.22, 'sine');
+}
+
+/* 完成单项作业：轻快上扬音 */
+async function playDoneBeep() {
+  try {
+    const ctx = await _ensureAudioCtx();
+    _scheduleDoneBeep(ctx);
+  } catch { /* 静默 */ }
+}
+
+/* 休息结束：闹钟式三段叮咚。若 ctx 仍被挂起则标记 pending，等用户交互后补播 */
+async function playBeep() {
+  try {
+    const ctx = await _ensureAudioCtx();
+    if (ctx.state === 'suspended') {
+      // 非用户手势触发时 resume 可能被浏览器拒绝，标记等待补播
+      _pendingBeep = true;
+      return;
+    }
+    _pendingBeep = false;
+    _scheduleBeep(ctx);
+  } catch { /* 静默 */ }
+}
+
+/* ==================================================================
+   彩纸 — 金星 + 彩色碎纸
+   ================================================================== */
+function fireConfetti() {
+  const overlay = document.getElementById('confetti');
+  overlay.innerHTML = '';
+  const colors = ['#ffb380','#f5c842','#a0d8b8','#fcb8b8','#b8c8f8','#d8b8f0','#ffe0a0','#f8a0b0'];
+  const shapes = ['circle', 'square', 'star'];
+  for (let i = 0; i < 55; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.left = (Math.random() * 96) + '%';
+    p.style.top = -(Math.random() * 50) + 'px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDelay = (Math.random() * 0.7) + 's';
+    p.style.animationDuration = (1.4 + Math.random() * 2) + 's';
+    const size = (6 + Math.random() * 12);
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    const shape = shapes[Math.floor(Math.random() * 3)];
+    if (shape === 'circle') p.style.borderRadius = '50%';
+    else if (shape === 'star') {
+      p.style.borderRadius = '0';
+      p.style.clipPath = 'polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)';
+    } else { p.style.borderRadius = '2px'; }
+    overlay.appendChild(p);
+  }
+  overlay.classList.add('show');
+  setTimeout(() => { overlay.classList.remove('show'); overlay.innerHTML = ''; }, 2800);
+}
+
+/* ==================================================================
+   休息系统
+   ================================================================== */
+function showRestOverlay(elapsedSec) {
+  document.getElementById('restOverlay').classList.add('show');
+  document.getElementById('taskList').classList.add('locked');
+  document.getElementById('restCountdown').textContent = fmtTime(AppState.restSeconds);
+  document.getElementById('restProgressFill').style.width = '0%';
+  document.getElementById('restTitle').textContent = '休息一下～';
+  document.getElementById('restSub').textContent = AppState.restSubjectLabel || '';
+  const elEl = document.getElementById('restElapsed');
+  if (elapsedSec > 0) {
+    elEl.textContent = '本次作业用时 ' + fmtTime(elapsedSec);
+    elEl.style.display = 'block';
+  } else {
+    elEl.style.display = 'none';
+  }
+}
+
+function hideRestOverlay() {
+  document.getElementById('restOverlay').classList.remove('show');
+  document.getElementById('taskList').classList.remove('locked');
+}
+
+function tickRest() {
+  // 基于时间戳计算，避免后台/锁屏时计时器暂停
+  const elapsed = Math.floor((Date.now() - AppState._restStartedAt) / 1000);
+  const remaining = Math.max(0, AppState.restTotal - elapsed);
+  AppState.restSeconds = remaining;
+
+  const cd = document.getElementById('restCountdown');
+  cd.textContent = fmtTime(AppState.restSeconds);
+
+  const pct = AppState.restTotal > 0
+    ? Math.round(((AppState.restTotal - AppState.restSeconds) / AppState.restTotal) * 100)
+    : 0;
+  document.getElementById('restProgressFill').style.width = pct + '%';
+
+  if (AppState.restSeconds <= 0) {
+    endRest();
+  }
+}
+
+function endRest() {
+  if (AppState.restIntervalId) {
+    clearInterval(AppState.restIntervalId);
+    AppState.restIntervalId = null;
+  }
+  if (AppState._restStartedAt) {
+    AppState.totalRestSeconds += Math.floor((Date.now() - AppState._restStartedAt) / 1000);
+    AppState._restStartedAt = null;
+  }
+  AppState.isResting = false;
+  AppState.restSeconds = 0;
+  AppState.restTotal = 0;
+  AppState.restSubjectLabel = '';
+  hideRestOverlay();
+  render();
+  playBeep();
+  showAlarmOverlay();
+}
+
+let _alarmBeepId = null;
+
+function showAlarmOverlay() {
+  if (document.getElementById('alarmOverlay').classList.contains('show')) return;
+  document.getElementById('alarmOverlay').classList.add('show');
+  document.getElementById('taskList').classList.add('locked');
+  // 持续响铃，每 1.8 秒一次
+  playBeep();
+  _alarmBeepId = setInterval(() => playBeep(), 1800);
+}
+
+function dismissAlarm() {
+  if (_alarmBeepId) { clearInterval(_alarmBeepId); _alarmBeepId = null; }
+  document.getElementById('alarmOverlay').classList.remove('show');
+  document.getElementById('taskList').classList.remove('locked');
+  showToast('休息结束，继续加油吧 ✨');
+}
+
+/* ==================================================================
+   Render — 完整渲染
+   ================================================================== */
+function render() {
+  document.getElementById('headerDate').textContent = formatDate();
+
+  const listEl = document.getElementById('taskList');
+  const progCard = document.getElementById('progressCard');
+  const summaryBar = document.getElementById('summaryBar');
+
+  if (AppState.tasks.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-hint">
+        <span class="big-doodle">📝</span>
+        还没有作业，快添加吧
+      </div>`;
+    progCard.style.display = 'none';
+    summaryBar.style.display = 'none';
+    return;
+  }
+
+  // 进度 + 统计
+  const total = AppState.tasks.length;
+  const done = AppState.tasks.filter(t => t.status === 'done').length;
+  const totalEst = AppState.totalEstimate();
+  const totalActual = AppState.totalActualMinutes();
+  summaryBar.style.display = 'flex';
+  document.getElementById('totalMinutes').textContent = fmtMinutes(totalEst);
+
+  const actualEl = document.getElementById('summaryActual');
+  if (totalActual > 0) {
+    document.getElementById('actualTime').textContent = fmtMinutes(totalActual)
+      + (done === total && total > 0 ? '  全部完成！' : '');
+    actualEl.classList.add('show');
+  } else {
+    actualEl.classList.remove('show');
+  }
+
+  // 进度条
+  progCard.style.display = 'flex';
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressBar').classList.toggle('all-done', done === total && total > 0);
+  document.getElementById('progressText').textContent = `${done}/${total}`;
+
+  // 休息中锁定
+  if (AppState.isResting) {
+    listEl.classList.add('locked');
+  } else {
+    listEl.classList.remove('locked');
+  }
+
+  listEl.innerHTML = '';
+  AppState.tasks.forEach((task, idx) => {
+    const card = document.createElement('div');
+    card.className = 'task-card';
+    card.setAttribute('data-subject', task.subject);
+    card.setAttribute('data-status', task.status);
+    card.style.animationDelay = (idx * 0.05) + 's';
+
+    // 纸胶带
+    const tape = document.createElement('div');
+    tape.className = 'tape';
+    card.appendChild(tape);
+
+    // ── 主行：标签 + 内容 + 计时器 + 操作 ──
+    const mainRow = document.createElement('div');
+    mainRow.className = 'card-main';
+
+    const tag = document.createElement('span');
+    tag.className = 'task-subject-tag';
+    tag.textContent = task.subject;
+
+    const content = document.createElement('span');
+    content.className = 'task-content';
+    content.textContent = task.content;
+
+    const timer = document.createElement('span');
+    timer.className = 'task-timer';
+    timer.id = 'timer-' + task.id;
+    if (task.status === 'done') {
+      timer.textContent = fmtTime(task.elapsed);
+    } else if (task.status === 'active') {
+      timer.textContent = fmtTime(task.elapsed);
+    } else {
+      timer.textContent = '—';
+    }
+
+    mainRow.appendChild(tag);
+    mainRow.appendChild(content);
+    mainRow.appendChild(timer);
+
+    // 操作区
+    if (task.status === 'pending') {
+      const btn = document.createElement('button');
+      btn.className = 'task-action btn-start';
+      btn.setAttribute('aria-label', '开始');
+      btn.onclick = () => { if (!AppState.isResting) Actions.startTask(task.id); };
+      mainRow.appendChild(btn);
+    } else if (task.status === 'active') {
+      const finishBtn = document.createElement('button');
+      finishBtn.className = 'task-action btn-finish';
+      finishBtn.textContent = '✓';
+      finishBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); Actions.finishTask(task.id); };
+      mainRow.appendChild(finishBtn);
+    } else {
+      const mark = document.createElement('span');
+      mark.className = 'task-done-mark';
+      mark.innerHTML = '<span class="star-body">⭐</span>';
+      mainRow.appendChild(mark);
+    }
+
+    // 删除按钮（非进行中、非休息中）
+    if (task.status !== 'active') {
+      const del = document.createElement('button');
+      del.className = 'btn-delete';
+      del.textContent = '×';
+      del.onclick = (e) => { e.stopPropagation(); if (!AppState.isResting) Actions.deleteTask(task.id); };
+      mainRow.appendChild(del);
+    }
+
+    card.appendChild(mainRow);
+
+    // ── 底栏：预计时间 + 调整按钮 ──
+    const extraRow = document.createElement('div');
+    extraRow.className = 'card-extra';
+
+    const estRow = document.createElement('span');
+    estRow.className = 'est-row';
+
+    const estIcon = document.createElement('span');
+    estIcon.className = 'est-icon';
+    estIcon.textContent = '⏱';
+
+    const estVal = document.createElement('span');
+    estVal.className = 'est-val';
+    estVal.textContent = (task.estimatedMinutes || 0) + ' 分钟';
+
+    estRow.appendChild(estIcon);
+    estRow.appendChild(estVal);
+
+    // 调整按钮（仅 pending 状态可调）
+    if (task.status === 'pending' && !AppState.isResting) {
+      const btnMinus = document.createElement('button');
+      btnMinus.className = 'btn-est';
+      btnMinus.textContent = '−';
+      btnMinus.disabled = (task.estimatedMinutes || 0) <= 1;
+      btnMinus.onclick = (e) => { e.stopPropagation(); Actions.adjustEstimate(task.id, -1); };
+      estRow.appendChild(btnMinus);
+
+      const btnPlus = document.createElement('button');
+      btnPlus.className = 'btn-est';
+      btnPlus.textContent = '+';
+      btnPlus.disabled = (task.estimatedMinutes || 0) >= 120;
+      btnPlus.onclick = (e) => { e.stopPropagation(); Actions.adjustEstimate(task.id, 1); };
+      estRow.appendChild(btnPlus);
+    }
+
+    extraRow.appendChild(estRow);
+
+    card.appendChild(extraRow);
+    listEl.appendChild(card);
+  });
+
+  AppState.save();
+}
+
+/* ==================================================================
+   完成报告
+   ================================================================== */
+let _chartPie = null;
+let _chartBar = null;
+
+function showReport() {
+  const tasks = AppState.tasks;
+  const totalTasks = tasks.length;
+  const totalActualSec = tasks.reduce((s, t) => s + (t.elapsed || 0), 0);
+  const totalEstMin = tasks.reduce((s, t) => s + (t.estimatedMinutes || 0), 0);
+  const totalRestMin = Math.round(AppState.totalRestSeconds / 60);
+
+  // 统计卡片
+  document.getElementById('statTasks').textContent = totalTasks;
+  document.getElementById('statActual').textContent = Math.round(totalActualSec / 60) + '分';
+  document.getElementById('statRest').textContent = totalRestMin + '分';
+
+  // 按时完成率（仅统计已完成任务）
+  let onTimeCount = 0;
+  tasks.filter(t => t.status === 'done').forEach(t => {
+    const estSec = (t.estimatedMinutes || 0) * 60;
+    if ((t.elapsed || 0) <= estSec) onTimeCount++;
+  });
+  const doneCount = tasks.filter(t => t.status === 'done').length;
+  const rate = doneCount > 0 ? Math.round((onTimeCount / doneCount) * 100) : 0;
+  document.getElementById('statOnTime').textContent = rate + '%';
+
+  // 日期
+  document.getElementById('reportDate').textContent = formatDate();
+
+  // 作业明细表
+  const tbody = document.getElementById('reportTableBody');
+  tbody.innerHTML = '';
+  tasks.forEach(t => {
+    const estMin = t.estimatedMinutes || 0;
+    const actualMin = Math.round((t.elapsed || 0) / 60);
+    const remaining = estMin - actualMin; // 预计 − 实际：正=剩余，负=超时
+    let statusHTML = '';
+    let statusClass = '';
+    if (remaining > 0) {
+      statusHTML = '剩余 ' + remaining + ' 分';
+      statusClass = 'td-status-ahead';
+    } else if (remaining === 0) {
+      statusHTML = '刚好完成';
+      statusClass = 'td-status-on-time';
+    } else {
+      statusHTML = '超时 ' + (-remaining) + ' 分';
+      statusClass = 'td-status-over';
+    }
+
+    const tr = document.createElement('tr');
+
+    const tdSubject = document.createElement('td');
+    tdSubject.className = 'td-subject';
+    tdSubject.textContent = t.subject;
+
+    const tdContent = document.createElement('td');
+    tdContent.textContent = t.content;
+
+    const tdEst = document.createElement('td');
+    tdEst.textContent = estMin + '分';
+
+    const tdActual = document.createElement('td');
+    tdActual.textContent = actualMin + '分';
+
+    const tdStatus = document.createElement('td');
+    tdStatus.className = statusClass;
+    tdStatus.textContent = statusHTML;
+
+    tr.appendChild(tdSubject);
+    tr.appendChild(tdContent);
+    tr.appendChild(tdEst);
+    tr.appendChild(tdActual);
+    tr.appendChild(tdStatus);
+    tbody.appendChild(tr);
+  });
+
+  // 销毁旧图表
+  if (_chartPie) { _chartPie.destroy(); _chartPie = null; }
+  if (_chartBar) { _chartBar.destroy(); _chartBar = null; }
+
+  // 饼图：各科目用时占比
+  const subjectColors = {
+    '语文': '#f0a8a8', '数学': '#a0b8f0', '英语': '#80c8a0',
+    '科学': '#b898e0', '其他': '#e8b878'
+  };
+  const subjectSecMap = {};
+  tasks.forEach(t => {
+    const subj = t.subject;
+    subjectSecMap[subj] = (subjectSecMap[subj] || 0) + (t.elapsed || 0);
+  });
+  const pieLabels = Object.keys(subjectSecMap);
+  const pieData = pieLabels.map(k => Math.round(subjectSecMap[k] / 60));
+  const pieColors = pieLabels.map(k => subjectColors[k] || '#d0c0b0');
+
+  const pieCtx = document.getElementById('chartPie').getContext('2d');
+  _chartPie = new Chart(pieCtx, {
+    type: 'pie',
+    data: {
+      labels: pieLabels,
+      datasets: [{
+        data: pieData,
+        backgroundColor: pieColors,
+        borderColor: '#fffef9',
+        borderWidth: 3,
+      }],
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: '"ZCOOL KuaiLe"', size: 13 }, padding: 16 } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.raw + ' 分钟' } },
+      },
+    },
+  });
+
+  // 柱状图：预计 vs 实际
+  const barLabels = tasks.map(t => t.content.length > 6 ? t.content.substring(0, 6) + '…' : t.content);
+  const estData = tasks.map(t => t.estimatedMinutes || 0);
+  const actData = tasks.map(t => Math.round((t.elapsed || 0) / 60));
+
+  const barCtx = document.getElementById('chartBar').getContext('2d');
+  _chartBar = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: barLabels,
+      datasets: [
+        {
+          label: '预计用时',
+          data: estData,
+          backgroundColor: '#e0d0c0',
+          borderColor: '#d0c0a8',
+          borderWidth: 2,
+          borderRadius: 6,
+        },
+        {
+          label: '实际用时',
+          data: actData,
+          backgroundColor: '#a0d8b8',
+          borderColor: '#7cc9a0',
+          borderWidth: 2,
+          borderRadius: 6,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: '"ZCOOL KuaiLe"', size: 13 }, padding: 16, usePointStyle: true } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + ' 分钟' } },
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: '分钟', font: { family: '"ZCOOL KuaiLe"' } }, ticks: { stepSize: 5 } },
+        x: { ticks: { font: { family: '"ZCOOL KuaiLe"', size: 11 } } },
+      },
+    },
+  });
+
+  document.getElementById('reportOverlay').classList.add('show');
+}
+
+function closeReport() {
+  document.getElementById('reportOverlay').classList.remove('show');
+  if (_chartPie) { _chartPie.destroy(); _chartPie = null; }
+  if (_chartBar) { _chartBar.destroy(); _chartBar = null; }
+}
+
+/* ==================================================================
+   Actions
+   ================================================================== */
+const Actions = {
+
+  /* 添加作业（含自动预估） */
+  addTask() {
+    if (AppState.isResting) { showToast('休息中，先休息一下吧～'); return; }
+    const subject = document.getElementById('subjectSelect').value;
+    const content = document.getElementById('contentInput').value.trim();
+    if (!content) { showToast('写点作业内容吧 ✏️'); document.getElementById('contentInput').focus(); return; }
+    const estimatedMinutes = AppState.estimateMinutes(content);
+    AppState.tasks.push({ id: uid(), subject, content, status: 'pending', elapsed: 0, estimatedMinutes });
+    document.getElementById('contentInput').value = '';
+    document.getElementById('contentInput').focus();
+    render();
+  },
+
+  /* 调整预估时间 */
+  adjustEstimate(taskId, delta) {
+    if (AppState.isResting) return;
+    const task = AppState.tasks.find(t => t.id === taskId);
+    if (!task || task.status !== 'pending') return;
+    task.estimatedMinutes = Math.max(1, Math.min(120, (task.estimatedMinutes || 0) + delta));
+    render();
+  },
+
+  /* 开始计时 */
+  startTask(taskId) {
+    if (AppState.isResting) return;
+    if (AppState.activeTaskId !== null) {
+      showToast('先把正在做的那个完成吧～');
+      return;
+    }
+    const task = AppState.tasks.find(t => t.id === taskId);
+    if (!task || task.status !== 'pending') return;
+
+    task.status = 'active';
+    task.elapsed = 0;
+    AppState.activeTaskId = taskId;
+    AppState.timerStartAt = Date.now();
+
+    AppState.timerIntervalId = setInterval(() => {
+      if (!AppState.timerStartAt) return;
+      const elapsed = Math.floor((Date.now() - AppState.timerStartAt) / 1000);
+      task.elapsed = elapsed;
+      const el = document.getElementById('timer-' + taskId);
+      if (el) el.textContent = fmtTime(elapsed);
+    }, 200);
+
+    render();
+  },
+
+  /* 完成计时 → 触发休息 */
+  finishTask(taskId) {
+    const task = AppState.tasks.find(t => t.id === taskId);
+    if (!task || task.status !== 'active') return;
+
+    if (AppState.timerIntervalId) {
+      clearInterval(AppState.timerIntervalId);
+      AppState.timerIntervalId = null;
+    }
+    task.elapsed = AppState.timerStartAt
+      ? Math.floor((Date.now() - AppState.timerStartAt) / 1000)
+      : (task.elapsed || 0);
+    const finishedElapsed = task.elapsed;
+    task.status = 'done';
+    const finishedSubject = task.subject;
+    AppState.activeTaskId = null;
+    AppState.timerStartAt = null;
+
+    playDoneBeep();
+    render();
+
+    // 全部完成 → 庆祝 + 报告
+    if (AppState.tasks.length > 0 && AppState.tasks.every(t => t.status === 'done')) {
+      setTimeout(() => { fireConfetti(); setTimeout(showReport, 1800); }, 400);
+      return;
+    }
+
+    // 检查该科目是否全部完成
+    const subjectTasks = AppState.tasks.filter(t => t.subject === finishedSubject);
+    const subjectAllDone = subjectTasks.length > 0 && subjectTasks.every(t => t.status === 'done');
+
+    const baseRest = 5 * 60; // 5分钟
+    const bonusRest = subjectAllDone ? 5 * 60 : 0; // 科目完成奖励 5分钟
+    const totalRest = baseRest + bonusRest;
+
+    let label = '';
+    if (subjectAllDone) {
+      label = `「${finishedSubject}」全部完成！奖励额外 5 分钟休息`;
+    }
+
+    Actions.startRest(totalRest, label, finishedElapsed);
+  },
+
+  /* 开始休息 */
+  startRest(seconds, label, elapsedSec) {
+    AppState.isResting = true;
+    AppState.restSeconds = seconds;
+    AppState.restTotal = seconds;
+    AppState.restSubjectLabel = label;
+    AppState._restStartedAt = Date.now();
+
+    showRestOverlay(elapsedSec || 0);
+
+    AppState.restIntervalId = setInterval(() => {
+      tickRest();
+    }, 1000);
+
+    render();
+  },
+
+  /* 跳过休息 */
+  skipRest() {
+    if (AppState.restIntervalId) {
+      clearInterval(AppState.restIntervalId);
+      AppState.restIntervalId = null;
+    }
+    if (AppState._restStartedAt) {
+      AppState.totalRestSeconds += Math.floor((Date.now() - AppState._restStartedAt) / 1000);
+      AppState._restStartedAt = null;
+    }
+    AppState.isResting = false;
+    AppState.restSeconds = 0;
+    AppState.restTotal = 0;
+    AppState.restSubjectLabel = '';
+    hideRestOverlay();
+    render();
+    playBeep();
+    showAlarmOverlay();
+  },
+
+  /* 开始新一轮 */
+  startNewRound() {
+    AppState.tasks = [];
+    AppState.activeTaskId = null;
+    AppState.timerIntervalId = null;
+    AppState.timerStartAt = null;
+    AppState._restStartedAt = null;
+    AppState.isResting = false;
+    AppState.restSeconds = 0;
+    AppState.restTotal = 0;
+    AppState.restIntervalId = null;
+    AppState.totalRestSeconds = 0;
+    closeReport();
+    render();
+    showToast('新的一天，加油 ✨');
+  },
+
+  /* 删除作业 */
+  deleteTask(taskId) {
+    if (AppState.isResting) return;
+    const idx = AppState.tasks.findIndex(t => t.id === taskId);
+    if (idx === -1 || AppState.tasks[idx].status === 'active') return;
+    AppState.tasks.splice(idx, 1);
+    render();
+  },
+};
+
+/* ==================================================================
+   Keyboard
+   ================================================================== */
+document.getElementById('contentInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); Actions.addTask(); }
+});
+
+/* ==================================================================
+   每次用户交互时恢复 AudioContext（移动端锁屏后恢复播放）
+   ================================================================== */
+async function _onUserInteraction() {
+  if (_audioCtx && _audioCtx.state === 'suspended') {
+    try { await _audioCtx.resume(); } catch { /* 静默 */ }
+  }
+  // 锁屏期间 beep 未能播放，现在用户已交互，补播
+  if (_pendingBeep && _audioCtx && _audioCtx.state === 'running') {
+    _pendingBeep = false;
+    _scheduleBeep(_audioCtx);
+  }
+}
+document.addEventListener('touchstart', _onUserInteraction);
+document.addEventListener('click', _onUserInteraction);
+
+/* ==================================================================
+   页面可见性变化 — 后台切回前台时立即刷新计时器
+   ================================================================== */
+function _catchUpTimers() {
+  // 作业计时器：立即更新显示
+  if (AppState.activeTaskId && AppState.timerStartAt) {
+    const task = AppState.tasks.find(t => t.id === AppState.activeTaskId);
+    if (task && task.status === 'active') {
+      const elapsed = Math.floor((Date.now() - AppState.timerStartAt) / 1000);
+      task.elapsed = elapsed;
+      const el = document.getElementById('timer-' + AppState.activeTaskId);
+      if (el) el.textContent = fmtTime(elapsed);
+    }
+  }
+
+  // 休息计时器：立即追上实际剩余时间（endRest 会弹出闹钟）
+  if (AppState.isResting && AppState._restStartedAt) {
+    tickRest();
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  _catchUpTimers();
+});
+
+// 部分手机浏览器 visibilitychange 触发不稳定，focus 作为补充
+window.addEventListener('focus', () => {
+  _catchUpTimers();
+});
+
+/* ==================================================================
+   Init
+   ================================================================== */
+AppState.load();
+render();
+</script>
+</body>
+</html>
+

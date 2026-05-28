@@ -1403,7 +1403,7 @@
       </div>
 
       <div class="ocr-error" id="ocrError">
-        识别失败，请尝试更清晰的图片或手动输入
+        <span id="ocrErrorMsg">识别失败，请尝试更清晰的图片或手动输入</span>
         <button class="btn-retake" style="position:static;display:inline-flex;margin-left:8px;vertical-align:middle;" onclick="OCRMode.resetImage()">重试</button>
       </div>
 
@@ -2427,62 +2427,159 @@ const OCRMode = {
     this._ocrResults = [];
   },
 
+  /* 图片预处理：缩放 + 灰度 + 对比度增强 + 二值化 */
+  async _preprocessImage(imageDataURL) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 限制最大尺寸 1800px（平衡速度与精度）
+        const MAX = 1800;
+        let w = img.width, h = img.height;
+        if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const d = imageData.data;
+
+        // 灰度 + 自适应对比度拉伸 + 锐化
+        for (let i = 0; i < d.length; i += 4) {
+          const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          // 对比度拉伸：暗部更暗，亮部更亮
+          let v;
+          if (gray < 90)       v = gray * 0.6;                // 深色压缩
+          else if (gray > 200) v = Math.min(255, 200 + (gray - 200) * 1.5); // 亮部拉伸
+          else                 v = 50 + (gray - 90) * 1.2;    // 中间调增强
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        // 输出 JPEG，质量 0.92
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      };
+      img.onerror = () => reject(new Error('图片加载失败'));
+      img.src = imageDataURL;
+    });
+  },
+
   /* 启动 OCR */
   async startOCR(imageDataURL) {
     const loadingEl = document.getElementById('ocrLoading');
     const loadingText = document.getElementById('ocrLoadingText');
     const progressFill = document.getElementById('ocrProgressFill');
     const errorEl = document.getElementById('ocrError');
+    const errorMsg = document.getElementById('ocrErrorMsg');
     const resultPanel = document.getElementById('ocrResultPanel');
 
     loadingEl.classList.add('show');
     errorEl.classList.remove('show');
     resultPanel.classList.remove('show');
     progressFill.style.width = '0%';
-    loadingText.textContent = '识别中...';
 
-    // 30 秒超时
+    // 60 秒超时（含语言包下载时间）
     this._timeoutId = setTimeout(() => {
       this._terminateWorker();
       loadingEl.classList.remove('show');
+      if (errorMsg) errorMsg.textContent = '识别超时，请检查网络后重试';
       errorEl.classList.add('show');
-    }, 30000);
+    }, 60000);
 
     try {
-      // 创建或复用 worker
-      if (this._worker) { await this._worker.terminate(); }
-      this._worker = Tesseract.createWorker('chi_sim', 1, {
+      // ── 第1步：图片预处理 ──
+      loadingText.textContent = '预处理图片...';
+      progressFill.style.width = '10%';
+      const processedURL = await this._preprocessImage(imageDataURL);
+
+      // ── 第2步：销毁旧 worker ──
+      if (this._worker) {
+        try { await this._worker.terminate(); } catch { /* ignore */ }
+        this._worker = null;
+      }
+
+      // ── 第3步：创建 worker + 加载中英文语言包 ──
+      loadingText.textContent = '加载识别引擎...';
+      progressFill.style.width = '20%';
+
+      this._worker = await Tesseract.createWorker('chi_sim+eng', 1, {
         logger: (m) => {
-          if (m.status === 'recognizing text') {
-            const pct = Math.round((m.progress || 0) * 100);
+          if (!m || !m.status) return;
+          const s = m.status;
+          if (s === 'loading tesseract core') {
+            loadingText.textContent = '加载 Tesseract 核心...';
+            progressFill.style.width = '25%';
+          } else if (s === 'initializing tesseract') {
+            loadingText.textContent = '初始化引擎...';
+            progressFill.style.width = '30%';
+          } else if (s === 'loading language traineddata') {
+            loadingText.textContent = '下载中文语言包 (约12MB)...';
+            const pct = 30 + Math.round((m.progress || 0) * 30);
             progressFill.style.width = pct + '%';
-            loadingText.textContent = '识别中 ' + pct + '%';
+          } else if (s === 'recognizing text') {
+            const pct = 60 + Math.round((m.progress || 0) * 40);
+            progressFill.style.width = pct + '%';
+            loadingText.textContent = '识别文字中 ' + Math.round((m.progress || 0) * 100) + '%';
           }
         },
       });
 
-      const { data } = await this._worker.recognize(imageDataURL);
+      // ── 第4步：调优参数 ──
+      await this._worker.setParameters({
+        tessedit_pageseg_mode: '6',     // 假设为统一文本块
+        preserve_interword_spaces: '1', // 保留词间空格
+        tessedit_ocr_engine_mode: '1',  // LSTM 神经网络引擎
+        textord_heavy_nr: '1',          // 加强降噪
+      });
+
+      // ── 第5步：执行识别 ──
+      const { data } = await this._worker.recognize(processedURL);
       clearTimeout(this._timeoutId);
       loadingEl.classList.remove('show');
 
       const text = (data && data.text) ? data.text.trim() : '';
+      const confidence = (data && typeof data.confidence === 'number') ? data.confidence : 0;
+
       if (!text || text.length < 2) {
+        if (errorMsg) errorMsg.textContent = '未识别到文字，请确保图片清晰、光线充足';
         errorEl.classList.add('show');
         return;
       }
 
-      // 解析识别结果
+      // ── 第6步：解析结果 ──
       this._parseText(text);
       if (this._ocrResults.length === 0) {
+        if (errorMsg) errorMsg.textContent = '未能解析出作业条目，请检查图片内容';
         errorEl.classList.add('show');
         return;
       }
 
       this._renderResults();
       resultPanel.classList.add('show');
+
+      // 低置信度提示但不阻止使用
+      if (confidence > 0 && confidence < 45) {
+        showToast('识别置信度较低，请检查结果后手动修正 ✏️');
+      }
     } catch (err) {
       clearTimeout(this._timeoutId);
       loadingEl.classList.remove('show');
+
+      let msg = '识别失败，请尝试更清晰的图片或手动输入';
+      if (err && err.message) {
+        if (err.message.includes('NetworkError') || err.message.includes('Failed to fetch') || err.message.includes('load language')) {
+          msg = '语言包下载失败，请检查网络连接后重试';
+        } else if (err.message.includes('timeout') || err.message.includes('Timeout')) {
+          msg = '识别超时，图片可能过大，请尝试裁剪后重试';
+        } else if (err.message.includes('图片加载失败')) {
+          msg = '图片加载失败，请重新选择';
+        }
+      }
+      if (errorMsg) errorMsg.textContent = msg;
       errorEl.classList.add('show');
       console.error('OCR error:', err);
     }

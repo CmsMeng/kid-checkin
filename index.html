@@ -1210,6 +1210,7 @@ const AppState = {
   restTotal: 0,
   restIntervalId: null,
   _restStartedAt: null,
+  _restEndAt: null,        // 绝对结束时间戳，用于锁屏后准确倒计时
   restSubjectLabel: '',
   totalRestSeconds: 0,     // 累计休息秒数（用于报告）
 
@@ -1431,18 +1432,19 @@ function hideRestOverlay() {
 }
 
 function tickRest() {
-  // 基于时间戳计算，避免后台/锁屏时计时器暂停
-  const elapsed = Math.floor((Date.now() - AppState._restStartedAt) / 1000);
-  const remaining = Math.max(0, AppState.restTotal - elapsed);
+  if (!AppState._restEndAt) return;
+  // 基于绝对结束时间戳计算剩余秒数，锁屏/后台也能准确
+  const remaining = Math.max(0, Math.ceil((AppState._restEndAt - Date.now()) / 1000));
   AppState.restSeconds = remaining;
 
   const cd = document.getElementById('restCountdown');
-  cd.textContent = fmtTime(AppState.restSeconds);
+  if (cd) cd.textContent = fmtTime(AppState.restSeconds);
 
   const pct = AppState.restTotal > 0
     ? Math.round(((AppState.restTotal - AppState.restSeconds) / AppState.restTotal) * 100)
     : 0;
-  document.getElementById('restProgressFill').style.width = pct + '%';
+  const fill = document.getElementById('restProgressFill');
+  if (fill) fill.style.width = pct + '%';
 
   if (AppState.restSeconds <= 0) {
     endRest();
@@ -1458,6 +1460,7 @@ function endRest() {
     AppState.totalRestSeconds += Math.floor((Date.now() - AppState._restStartedAt) / 1000);
     AppState._restStartedAt = null;
   }
+  AppState._restEndAt = null;
   AppState.isResting = false;
   AppState.restSeconds = 0;
   AppState.restTotal = 0;
@@ -1466,6 +1469,7 @@ function endRest() {
   render();
   playBeep();
   showAlarmOverlay();
+  _sendNotification();
 }
 
 let _alarmBeepId = null;
@@ -1922,7 +1926,9 @@ const Actions = {
     AppState.restSeconds = seconds;
     AppState.restTotal = seconds;
     AppState.restSubjectLabel = label;
-    AppState._restStartedAt = Date.now();
+    const now = Date.now();
+    AppState._restStartedAt = now;
+    AppState._restEndAt = now + seconds * 1000;
 
     showRestOverlay(elapsedSec || 0);
 
@@ -1943,6 +1949,7 @@ const Actions = {
       AppState.totalRestSeconds += Math.floor((Date.now() - AppState._restStartedAt) / 1000);
       AppState._restStartedAt = null;
     }
+    AppState._restEndAt = null;
     AppState.isResting = false;
     AppState.restSeconds = 0;
     AppState.restTotal = 0;
@@ -1960,6 +1967,7 @@ const Actions = {
     AppState.timerIntervalId = null;
     AppState.timerStartAt = null;
     AppState._restStartedAt = null;
+    AppState._restEndAt = null;
     AppState.isResting = false;
     AppState.restSeconds = 0;
     AppState.restTotal = 0;
@@ -1988,6 +1996,26 @@ document.getElementById('contentInput').addEventListener('keydown', (e) => {
 });
 
 /* ==================================================================
+   Notification — 系统通知作为闹钟后备（锁屏/后台也能收到）
+   ================================================================== */
+let _notifyGranted = false;
+
+function _requestNotification() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') { _notifyGranted = true; return; }
+  if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => { if (p === 'granted') _notifyGranted = true; });
+  }
+}
+
+function _sendNotification() {
+  if (!_notifyGranted || !('Notification' in window) || document.hidden !== true) return;
+  try {
+    new Notification('休息时间结束！', { body: '该继续做作业啦～', icon: '📝', tag: 'rest-end', requireInteraction: true });
+  } catch { /* ignore */ }
+}
+
+/* ==================================================================
    每次用户交互时恢复 AudioContext（移动端锁屏后恢复播放）
    ================================================================== */
 async function _onUserInteraction() {
@@ -1998,6 +2026,10 @@ async function _onUserInteraction() {
   if (_pendingBeep && _audioCtx && _audioCtx.state === 'running') {
     _pendingBeep = false;
     _scheduleBeep(_audioCtx);
+  }
+  // 首次交互时请求通知权限
+  if (!_notifyGranted && Notification.permission === 'default') {
+    _requestNotification();
   }
 }
 document.addEventListener('touchstart', _onUserInteraction);
@@ -2018,8 +2050,9 @@ function _catchUpTimers() {
     }
   }
 
-  // 休息计时器：立即追上实际剩余时间（endRest 会弹出闹钟）
-  if (AppState.isResting && AppState._restStartedAt) {
+  // 休息计时器：用绝对时间戳追上实际剩余时间
+  // tickRest() 发现 ≤0 时会自动调用 endRest() → 弹出闹钟 + 发送通知
+  if (AppState.isResting && AppState._restEndAt) {
     tickRest();
   }
 }

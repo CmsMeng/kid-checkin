@@ -1,0 +1,8 @@
+name = "kid-checkin-ocr"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+# 免费计划：10 万次请求/天，足够 OCR 使用
+# 部署命令：npx wrangler deploy
+# 设置密钥：npx wrangler secret put BAIDU_API_KEY
+#           npx wrangler secret put BAIDU_SECRET_KEY

@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   /* ============================================================
      CSS 变量 — 软萌手绘风配色体系
@@ -1447,7 +1446,7 @@
   </div>
 
   <div class="doodle-row">⁕ ✦ ⁕ ✿ ⁕</div>
-  <div class="version-footer">V26.5.4</div>
+  <div class="version-footer">V26.5.5</div>
 </div>
 
 <!-- ====== Toast ====== -->
@@ -2338,10 +2337,12 @@ const Actions = {
 /* ==================================================================
    OCR 拍照识别系统
    ================================================================== */
+const OCR_WORKER_URL = 'https://kid-checkin-ocr.kid-checkin.workers.dev';
+// ↑ 部署 Cloudflare Worker 后替换 REPLACE_ME 为实际子域名
+
 const OCRMode = {
   _ocrActive: false,
   _ocrResults: [],  // [{ subject, content, id }]
-  _worker: null,
   _timeoutId: null,
 
   /* 科目关键词映射 */
@@ -2482,68 +2483,65 @@ const OCRMode = {
     resultPanel.classList.remove('show');
     progressFill.style.width = '0%';
 
-    // 60 秒超时（含语言包下载时间）
+    // 30 秒超时（云端识别通常 1-3 秒）
+    const controller = new AbortController();
     this._timeoutId = setTimeout(() => {
-      this._terminateWorker();
+      controller.abort();
       loadingEl.classList.remove('show');
       if (errorMsg) errorMsg.textContent = '识别超时，请检查网络后重试';
       errorEl.classList.add('show');
-    }, 60000);
+    }, 30000);
 
     try {
       // ── 第1步：图片预处理 ──
       loadingText.textContent = '预处理图片...';
-      progressFill.style.width = '10%';
+      progressFill.style.width = '15%';
       const processedURL = await this._preprocessImage(imageDataURL);
 
-      // ── 第2步：销毁旧 worker ──
-      if (this._worker) {
-        try { await this._worker.terminate(); } catch { /* ignore */ }
-        this._worker = null;
-      }
+      // 上传到云端 OCR
+      loadingText.textContent = '上传图片中...';
+      progressFill.style.width = '30%';
 
-      // ── 第3步：创建 worker + 加载中英文语言包 ──
-      loadingText.textContent = '加载识别引擎...';
-      progressFill.style.width = '20%';
+      // 去掉 data:image/...;base64, 前缀
+      const base64 = processedURL.includes(',') ? processedURL.split(',')[1] : processedURL;
 
-      this._worker = await Tesseract.createWorker('chi_sim+eng', 1, {
-        logger: (m) => {
-          if (!m || !m.status) return;
-          const s = m.status;
-          if (s === 'loading tesseract core') {
-            loadingText.textContent = '加载 Tesseract 核心...';
-            progressFill.style.width = '25%';
-          } else if (s === 'initializing tesseract') {
-            loadingText.textContent = '初始化引擎...';
-            progressFill.style.width = '30%';
-          } else if (s === 'loading language traineddata') {
-            loadingText.textContent = '下载中文语言包 (约12MB)...';
-            const pct = 30 + Math.round((m.progress || 0) * 30);
-            progressFill.style.width = pct + '%';
-          } else if (s === 'recognizing text') {
-            const pct = 60 + Math.round((m.progress || 0) * 40);
-            progressFill.style.width = pct + '%';
-            loadingText.textContent = '识别文字中 ' + Math.round((m.progress || 0) * 100) + '%';
-          }
-        },
+      const resp = await fetch(OCR_WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+        signal: controller.signal,
       });
 
-      // ── 第4步：调优参数 ──
-      await this._worker.setParameters({
-        tessedit_pageseg_mode: '6',     // 假设为统一文本块
-        preserve_interword_spaces: '1', // 保留词间空格
-        tessedit_ocr_engine_mode: '1',  // LSTM 神经网络引擎
-        textord_heavy_nr: '1',          // 加强降噪
-      });
+      loadingText.textContent = '云端识别中...';
+      progressFill.style.width = '70%';
 
-      // ── 第5步：执行识别 ──
-      const { data } = await this._worker.recognize(processedURL);
+      const result = await resp.json();
       clearTimeout(this._timeoutId);
       loadingEl.classList.remove('show');
 
-      const text = (data && data.text) ? data.text.trim() : '';
-      const confidence = (data && typeof data.confidence === 'number') ? data.confidence : 0;
+      // 检查百度 OCR API 错误
+      if (result.error_code) {
+        const apiErrors = {
+          17:  '今日识别次数已用完（500次/天），请明天再试',
+          18:  '今日识别次数已用完，请明天再试',
+          19:  '今日识别次数已用完，请明天再试',
+          100: '识别服务暂不可用，请稍后重试',
+          216100: '图片内容为空或无法识别',
+          216101: '图片格式不支持',
+          216102: '图片太大，请尝试裁剪后重试',
+          216103: '图片尺寸太小，请使用更清晰的图片',
+          282000: '服务器内部错误，请稍后重试',
+        };
+        const msg = apiErrors[result.error_code] || ('识别失败：' + (result.error_msg || '未知错误'));
+        if (errorMsg) errorMsg.textContent = msg;
+        errorEl.classList.add('show');
+        console.error('Baidu OCR error:', result.error_code, result.error_msg);
+        return;
+      }
 
+      // 百度返回: { words_result: [{ words: "line1" }, ...], words_result_num: N }
+      const wordsResult = result.words_result || [];
+      const text = wordsResult.map(item => item.words || '').join('\n').trim();
       if (!text || text.length < 2) {
         if (errorMsg) errorMsg.textContent = '未识别到文字，请确保图片清晰、光线充足';
         errorEl.classList.add('show');
@@ -2562,19 +2560,20 @@ const OCRMode = {
       resultPanel.classList.add('show');
 
       // 低置信度提示但不阻止使用
-      if (confidence > 0 && confidence < 45) {
-        showToast('识别置信度较低，请检查结果后手动修正 ✏️');
-      }
+      showToast('已识别 ' + this._ocrResults.length + ' 条作业 📋');
     } catch (err) {
       clearTimeout(this._timeoutId);
       loadingEl.classList.remove('show');
 
       let msg = '识别失败，请尝试更清晰的图片或手动输入';
+      if (err && err.name === 'AbortError') {
+        msg = '识别超时，请检查网络后重试';
+      } else
       if (err && err.message) {
-        if (err.message.includes('NetworkError') || err.message.includes('Failed to fetch') || err.message.includes('load language')) {
-          msg = '语言包下载失败，请检查网络连接后重试';
+        if (err.message.includes('NetworkError') || err.message.includes('Failed to fetch')) {
+          msg = '无法连接识别服务，请检查网络连接';
         } else if (err.message.includes('timeout') || err.message.includes('Timeout')) {
-          msg = '识别超时，图片可能过大，请尝试裁剪后重试';
+          msg = '识别超时，请检查网络后重试';
         } else if (err.message.includes('图片加载失败')) {
           msg = '图片加载失败，请重新选择';
         }
@@ -2585,13 +2584,6 @@ const OCRMode = {
     }
   },
 
-  /* 终止 worker */
-  async _terminateWorker() {
-    if (this._worker) {
-      try { await this._worker.terminate(); } catch { /* ignore */ }
-      this._worker = null;
-    }
-  },
 
   /* 智能文本解析 */
   _parseText(text) {

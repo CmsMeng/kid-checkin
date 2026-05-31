@@ -996,6 +996,72 @@
   .report-actions button:active { transform: scale(0.95); }
 
   /* ============================================================
+     恢复提示条
+     ============================================================ */
+  .recovery-banner {
+    display: none;
+    background: #FFF8E1;
+    border: 2px dashed #e8d48c;
+    border-radius: 16px 6px 16px 6px;
+    padding: 14px 16px;
+    margin-bottom: 6px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    animation: banner-in 0.4s ease-out;
+    box-shadow: 0 2px 8px rgba(200,160,60,0.12);
+  }
+  .recovery-banner.show { display: flex; }
+  @keyframes banner-in {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .recovery-banner .rec-text {
+    font-size: 13px;
+    color: #6b5e3e;
+    letter-spacing: 0.5px;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.5;
+  }
+  .recovery-banner .rec-text .rec-date { font-weight: 700; color: #8b6e30; }
+  .recovery-banner .rec-btns {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .rec-btn-new {
+    padding: 10px 18px;
+    min-height: 44px;
+    border: 2.5px solid #f0c090;
+    border-radius: 20px 6px 20px 6px;
+    background: #fff8f0;
+    color: #e08850;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+    touch-action: manipulation;
+    white-space: nowrap;
+  }
+  .rec-btn-new:active { background: #fff0d0; transform: scale(0.95); }
+  .rec-link-backup {
+    font-size: 11px;
+    color: #c0a878;
+    cursor: pointer;
+    text-decoration: underline;
+    letter-spacing: 0.5px;
+    align-self: flex-end;
+    display: none;
+    white-space: nowrap;
+  }
+  .rec-link-backup.show { display: inline; }
+  .rec-link-backup:active { color: #8b6e30; }
+
+  /* ============================================================
      响应式适配
      ============================================================ */
 
@@ -1050,6 +1116,15 @@
 <body>
 
 <div class="app">
+  <!-- ====== 恢复提示条 ====== -->
+  <div class="recovery-banner" id="recoveryBanner">
+    <span class="rec-text" id="recText">已恢复上次任务</span>
+    <div class="rec-btns">
+      <button class="rec-btn-new" id="recBtnNew" onclick="AppState.startNewDay();render();hideRecoveryBanner();">开始新任务</button>
+    </div>
+    <span class="rec-link-backup" id="recLinkBackup" onclick="var r=AppState._pendingRecovery;if(r){AppState.recoverFromPending();}render();hideRecoveryBanner();">从备份恢复</span>
+  </div>
+
   <!-- ====== 头部 ====== -->
   <div class="header">
     <h1>今日作业打卡</h1>
@@ -1197,6 +1272,9 @@
 /* ==================================================================
    AppState — 唯一状态对象
    ================================================================== */
+const STORAGE_KEY = 'hw_checkin_v3';
+const BACKUP_KEY = 'hw_checkin_v3_backup';
+
 const AppState = {
   date: getTodayStr(),
   tasks: [],
@@ -1245,20 +1323,14 @@ const AppState = {
         estimatedMinutes: t.estimatedMinutes,
       })),
       totalRestSeconds: this.totalRestSeconds,
+      savedAt: Date.now(),
     };
-    localStorage.setItem('hw_checkin_v2', JSON.stringify(payload));
+    const json = JSON.stringify(payload);
+    try { localStorage.setItem(BACKUP_KEY, json); } catch { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEY, json); } catch { /* ignore */ }
   },
 
   load() {
-    try {
-      const raw = localStorage.getItem('hw_checkin_v2');
-      if (!raw) return;
-      const obj = JSON.parse(raw);
-      if (obj.date === getTodayStr()) {
-        this.tasks = obj.tasks;
-        this.totalRestSeconds = obj.totalRestSeconds || 0;
-      }
-    } catch { /* ignore */ }
     this.activeTaskId = null;
     this.timerIntervalId = null;
     this.timerStartAt = null;
@@ -1267,7 +1339,66 @@ const AppState = {
     this.restTotal = 0;
     this.restIntervalId = null;
     this._restStartedAt = null;
+    let fromBackup = false;
+
+    try {
+      let raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { raw = localStorage.getItem(BACKUP_KEY); fromBackup = !!raw; }
+      if (!raw) return { recovered: false, fromBackup: false };
+
+      const obj = JSON.parse(raw);
+      if (obj.date === getTodayStr()) {
+        this.tasks = Array.isArray(obj.tasks) ? obj.tasks : [];
+        this.totalRestSeconds = obj.totalRestSeconds || 0;
+        this.tasks.forEach(t => { if (t.status === 'active') t.status = 'pending'; });
+        return { recovered: true, fromBackup };
+      }
+      // 不同日期：暂存等待 UI 决定
+      this._pendingRecovery = {
+        date: obj.date,
+        tasks: Array.isArray(obj.tasks) ? obj.tasks : [],
+        totalRestSeconds: obj.totalRestSeconds || 0,
+        savedAt: obj.savedAt || null,
+        fromBackup,
+      };
+      return { recovered: false, fromBackup: false };
+    } catch {
+      try {
+        const raw = localStorage.getItem(BACKUP_KEY);
+        if (raw) {
+          const obj = JSON.parse(raw);
+          if (obj.date === getTodayStr()) {
+            this.tasks = Array.isArray(obj.tasks) ? obj.tasks : [];
+            this.totalRestSeconds = obj.totalRestSeconds || 0;
+            this.tasks.forEach(t => { if (t.status === 'active') t.status = 'pending'; });
+            return { recovered: true, fromBackup: true };
+          }
+        }
+      } catch { /* ignore */ }
+      return { recovered: false, fromBackup: false };
+    }
   },
+
+  /* 从跨日期数据恢复 */
+  recoverFromPending() {
+    if (!this._pendingRecovery) return;
+    this.tasks = this._pendingRecovery.tasks;
+    this.totalRestSeconds = this._pendingRecovery.totalRestSeconds || 0;
+    this.tasks.forEach(t => { t.status = 'pending'; t.elapsed = 0; });
+    this._pendingRecovery = null;
+    this.save();
+  },
+
+  /* 开始全新一天 */
+  startNewDay() {
+    this._pendingRecovery = null;
+    this.tasks = [];
+    this.totalRestSeconds = 0;
+    this.date = getTodayStr();
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(BACKUP_KEY); } catch {}
+  },
+
 };
 
 /* ==================================================================
@@ -1654,7 +1785,6 @@ function render() {
     listEl.appendChild(card);
   });
 
-  AppState.save();
 }
 
 /* ==================================================================
@@ -1837,6 +1967,7 @@ const Actions = {
     if (!content) { showToast('写点作业内容吧 ✏️'); document.getElementById('contentInput').focus(); return; }
     const estimatedMinutes = AppState.estimateMinutes(content);
     AppState.tasks.push({ id: uid(), subject, content, status: 'pending', elapsed: 0, estimatedMinutes });
+    AppState.save();
     document.getElementById('contentInput').value = '';
     document.getElementById('contentInput').focus();
     render();
@@ -1865,6 +1996,7 @@ const Actions = {
     task.elapsed = 0;
     AppState.activeTaskId = taskId;
     AppState.timerStartAt = Date.now();
+    AppState.save();
 
     AppState.timerIntervalId = setInterval(() => {
       if (!AppState.timerStartAt) return;
@@ -1894,6 +2026,7 @@ const Actions = {
     const finishedSubject = task.subject;
     AppState.activeTaskId = null;
     AppState.timerStartAt = null;
+    AppState.save();
 
     playDoneBeep();
     render();
@@ -1984,6 +2117,7 @@ const Actions = {
     const idx = AppState.tasks.findIndex(t => t.id === taskId);
     if (idx === -1 || AppState.tasks[idx].status === 'active') return;
     AppState.tasks.splice(idx, 1);
+    AppState.save();
     render();
   },
 };
@@ -2068,10 +2202,83 @@ window.addEventListener('focus', () => {
 });
 
 /* ==================================================================
+   恢复提示条 UI
+   ================================================================== */
+function showRecoveryBanner(data) {
+  const banner = document.getElementById('recoveryBanner');
+  const textEl = document.getElementById('recText');
+  const linkEl = document.getElementById('recLinkBackup');
+  if (!banner || !textEl) return;
+
+  let dateStr = data.date || '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const m = parseInt(dateStr.split('-')[1]);
+    const d = parseInt(dateStr.split('-')[2]);
+    dateStr = m + '月' + d + '日';
+  }
+  const savedStr = data.savedAt ? ' ' + new Date(data.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + '保存' : '';
+  const done = data.tasks.filter(function(t) { return t.status === 'done'; }).length;
+  const total = data.tasks.length;
+  textEl.innerHTML = '已恢复上次任务（<span class="rec-date">' + dateStr + savedStr + '</span>），' + done + '/' + total + '项已完成';
+
+  banner.classList.add('show');
+  if (data.fromBackup && linkEl) linkEl.classList.add('show');
+
+  clearTimeout(window._recBannerTimer);
+  window._recBannerTimer = setTimeout(function() {
+    banner.classList.remove('show');
+  }, 5000);
+}
+
+function hideRecoveryBanner() {
+  clearTimeout(window._recBannerTimer);
+  var banner = document.getElementById('recoveryBanner');
+  if (banner) banner.classList.remove('show');
+}
+
+/* ==================================================================
+   自动保存
+   ================================================================== */
+var _autoSaveIntervalId = null;
+
+function startAutoSave() {
+  stopAutoSave();
+  _autoSaveIntervalId = setInterval(function() {
+    if (AppState.tasks.length > 0 || AppState.totalRestSeconds > 0) {
+      AppState.save();
+    }
+  }, 30000);
+}
+
+function stopAutoSave() {
+  if (_autoSaveIntervalId) { clearInterval(_autoSaveIntervalId); _autoSaveIntervalId = null; }
+}
+
+window.addEventListener('beforeunload', function() {
+  AppState.save();
+  stopAutoSave();
+});
+
+/* ==================================================================
    Init
    ================================================================== */
-AppState.load();
-render();
+(function init() {
+  var result = AppState.load();
+
+  if (AppState._pendingRecovery) {
+    var pr = AppState._pendingRecovery;
+    AppState.recoverFromPending();
+    showRecoveryBanner({
+      date: pr.date,
+      tasks: pr.tasks,
+      savedAt: pr.savedAt,
+      fromBackup: pr.fromBackup
+    });
+  }
+
+  render();
+  startAutoSave();
+})();
 </script>
 </body>
 </html>

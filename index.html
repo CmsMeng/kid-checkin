@@ -1061,6 +1061,61 @@
   .rec-link-backup.show { display: inline; }
   .rec-link-backup:active { color: #8b6e30; }
 
+  /* 自定义科目 */
+  .btn-add-subject {
+    flex: 0 0 auto; width: 44px; height: 44px;
+    border: 2px dashed var(--ink-faint); border-radius: 20px 8px 20px 8px;
+    background: #fffef9; color: var(--ink-light);
+    font-family: inherit; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; touch-action: manipulation; line-height: 1;
+  }
+  .btn-add-subject:active { background: #fef8f0; border-color: #c9a87c; color: #c9a87c; transform: scale(0.95); }
+  .btn-add-subject.limit { opacity: 0.4; pointer-events: none; }
+  .subject-dialog-mask {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+  }
+  .subject-dialog-mask.show { display: flex; }
+  .subject-dialog {
+    background: #fffef9; border-radius: 24px 8px 24px 8px;
+    border: 2.5px solid var(--ink-faint); padding: 24px 20px 20px;
+    width: 100%; max-width: 80vw;
+    box-shadow: 4px 6px 0 -1px rgba(0,0,0,0.08); text-align: center;
+    animation: pop-in 0.25s ease-out;
+  }
+  @keyframes pop-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  .subject-dialog .sd-title { font-size: 16px; font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; color: var(--ink); }
+  .subject-dialog .sd-hint { font-size: 12px; color: var(--ink-light); margin-bottom: 14px; letter-spacing: 0.5px; }
+  .subject-dialog input {
+    width: 100%; font-family: inherit; font-size: 16px;
+    border: 2px dashed var(--ink-faint); border-radius: 20px 6px 20px 6px;
+    padding: 12px 16px; background: #fffef9; color: var(--ink);
+    outline: none; text-align: center; letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .subject-dialog input:focus { border-color: #c9a87c; border-style: solid; }
+  .subject-dialog .sd-error { font-size: 12px; color: var(--danger); min-height: 18px; margin-bottom: 10px; letter-spacing: 0.5px; }
+  .subject-dialog .sd-btns { display: flex; gap: 10px; justify-content: center; }
+  .btn-sd-confirm {
+    padding: 10px 24px; min-height: 44px; border: 2.5px solid #a0d8b8;
+    border-radius: 20px 6px 20px 6px; background: #f4fdf6; color: #5ea870;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    cursor: pointer; letter-spacing: 1px; transition: all 0.15s; touch-action: manipulation;
+  }
+  .btn-sd-confirm:active { background: #e8f8ec; transform: scale(0.95); }
+  .btn-sd-cancel {
+    padding: 10px 24px; min-height: 44px; border: 2px dashed var(--ink-faint);
+    border-radius: 20px 6px 20px 6px; background: #fffef9; color: var(--ink-light);
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    cursor: pointer; letter-spacing: 1px; transition: all 0.15s; touch-action: manipulation;
+  }
+  .btn-sd-cancel:active { background: #f5f0e8; transform: scale(0.95); }
+  .custom-subject-hint {
+    font-size: 10px; color: var(--ink-light); text-align: center;
+    margin-top: 4px; letter-spacing: 0.5px; display: none;
+  }
+  .custom-subject-hint.show { display: block; }
+
   /* ============================================================
      响应式适配
      ============================================================ */
@@ -1142,9 +1197,38 @@
         <option value="科学">科学</option>
         <option value="其他">其他</option>
       </select>
+      <button class="btn-add-subject" id="btnAddSubject" onclick="showSubjectInput()" title="添加自定义科目">＋</button>
       <input type="text" id="contentInput" placeholder="写作业内容..." maxlength="40" autocomplete="off">
     </div>
     <button class="btn-add" id="btnAdd" onclick="Actions.addTask()">＋ 添加作业</button>
+  </div>
+  <div class="custom-subject-hint" id="customSubjectHint">长按自定义科目可删除</div>
+
+  <!-- 自定义科目输入弹窗 -->
+  <div class="subject-dialog-mask" id="subjectInputDialog">
+    <div class="subject-dialog">
+      <div class="sd-title">＋ 添加自定义科目</div>
+      <div class="sd-hint">输入科目名称（2-6个汉字）</div>
+      <input type="text" id="sdInput" placeholder="如：物理、化学..." maxlength="6" autocomplete="off">
+      <div class="sd-error" id="sdError"></div>
+      <div class="sd-btns">
+        <button class="btn-sd-cancel" onclick="hideSubjectInput()">取消</button>
+        <button class="btn-sd-confirm" onclick="confirmAddSubject()">确认添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自定义科目删除确认弹窗 -->
+  <div class="subject-dialog-mask" id="subjectDeleteDialog">
+    <div class="subject-dialog">
+      <div class="sd-title">删除自定义科目</div>
+      <div class="sd-hint" id="sdDeleteMsg">确定删除自定义科目吗？</div>
+      <div class="sd-error" id="sdDeleteWarning"></div>
+      <div class="sd-btns">
+        <button class="btn-sd-cancel" onclick="hideSubjectDelete()">取消</button>
+        <button class="btn-sd-confirm" style="border-color:#f0c8c8;background:#fff8f8;color:#e08888;" onclick="confirmDeleteSubject()">确认删除</button>
+      </div>
+    </div>
   </div>
 
   <!-- ====== 预计总用时 ====== -->
@@ -1175,7 +1259,7 @@
   </div>
 
   <div class="doodle-row">⁕ ✦ ⁕ ✿ ⁕</div>
-  <div class="version-footer">V26.5.3</div>
+  <div class="version-footer">V26.5.8</div>
 </div>
 
 <!-- ====== Toast ====== -->
@@ -1269,6 +1353,56 @@
 </div>
 
 <script>
+/* ==================================================================
+   CustomSubjects — 自定义科目管理
+   ================================================================== */
+const CUSTOM_SUBJECTS_KEY = 'hw_custom_subjects';
+const SUBJECT_COLOR_POOL = [
+  '#E0FFF5', '#FFE0EC', '#FFFDE0', '#E8F0FF',
+  '#FFF2E0', '#E0FFEF', '#F5E0FF', '#FFE8D0'
+];
+var CustomSubjects = {
+  _list: [],
+  load() {
+    try { var r = localStorage.getItem(CUSTOM_SUBJECTS_KEY); this._list = r ? JSON.parse(r) : []; if (!Array.isArray(this._list)) this._list = []; } catch { this._list = []; }
+  },
+  save() { try { localStorage.setItem(CUSTOM_SUBJECTS_KEY, JSON.stringify(this._list)); } catch {} },
+  getAll() { return this._list; },
+  exists(name) {
+    if (['语文','数学','英语','科学','其他'].indexOf(name) >= 0) return true;
+    return this._list.some(function(s) { return s.name === name; });
+  },
+  add(name) {
+    if (!name || !name.trim()) return { ok: false, error: '请输入科目名称' };
+    name = name.trim();
+    if (!/^[一-鿿]{2,6}$/.test(name)) return { ok: false, error: '请输入2-6个汉字' };
+    if (this.exists(name)) return { ok: false, error: '该科目已存在' };
+    if (this._list.length >= SUBJECT_COLOR_POOL.length) return { ok: false, error: '最多添加' + SUBJECT_COLOR_POOL.length + '个自定义科目' };
+    var color = SUBJECT_COLOR_POOL[this._list.length % SUBJECT_COLOR_POOL.length];
+    this._list.push({ name: name, color: color });
+    this.save();
+    return { ok: true, name: name };
+  },
+  remove(name) { this._list = this._list.filter(function(s) { return s.name !== name; }); this.save(); },
+  getColor(name) {
+    var found = this._list.find(function(s) { return s.name === name; });
+    if (found) return found.color;
+    var preset = {'语文':'#fce4e4','数学':'#e4ecfd','英语':'#e4faf0','科学':'#f0e8fa','其他':'#fdf0e0'};
+    return preset[name] || '#f5ead8';
+  },
+  getInkColor(name) {
+    var found = this._list.find(function(s) { return s.name === name; });
+    if (found) {
+      var hex = found.color.replace('#','');
+      var r = parseInt(hex.substring(0,2),16), g = parseInt(hex.substring(2,4),16), b = parseInt(hex.substring(4,6),16);
+      return (r*299+g*587+b*114)/1000 > 180 ? '#5a8070' : '#4a3f35';
+    }
+    var p = {'语文':'#c97a7a','数学':'#6b8ac9','英语':'#5ea882','科学':'#8b6eb8','其他':'#c99a6b'};
+    return p[name] || '#7a6a5a';
+  },
+  isDeletable(name) { return this._list.some(function(s) { return s.name === name; }); }
+};
+
 /* ==================================================================
    AppState — 唯一状态对象
    ================================================================== */
@@ -1693,6 +1827,12 @@ function render() {
     const tag = document.createElement('span');
     tag.className = 'task-subject-tag';
     tag.textContent = task.subject;
+    if (CustomSubjects.isDeletable(task.subject)) {
+      tag.style.background = CustomSubjects.getColor(task.subject);
+      tag.style.color = CustomSubjects.getInkColor(task.subject);
+      tag.style.borderColor = CustomSubjects.getColor(task.subject);
+      tag.style.borderStyle = 'dashed';
+    }
 
     const content = document.createElement('span');
     content.className = 'task-content';
@@ -1874,6 +2014,7 @@ function showReport() {
     '语文': '#f0a8a8', '数学': '#a0b8f0', '英语': '#80c8a0',
     '科学': '#b898e0', '其他': '#e8b878'
   };
+  CustomSubjects.getAll().forEach(function(s) { subjectColors[s.name] = s.color; });
   const subjectSecMap = {};
   tasks.forEach(t => {
     const subj = t.subject;
@@ -1952,6 +2093,123 @@ function closeReport() {
   document.getElementById('reportOverlay').classList.remove('show');
   if (_chartPie) { _chartPie.destroy(); _chartPie = null; }
   if (_chartBar) { _chartBar.destroy(); _chartBar = null; }
+}
+
+/* ==================================================================
+   自定义科目对话框
+   ================================================================== */
+var _subjectToDelete = null;
+
+function repopulateSubjectSelect() {
+  var sel = document.getElementById('subjectSelect');
+  var cur = sel.value;
+  // 清除旧的 optgroup
+  var og = sel.querySelector('optgroup');
+  if (og) og.remove();
+  var list = CustomSubjects.getAll();
+  if (list.length === 0) {
+    document.getElementById('customSubjectHint').classList.remove('show');
+    return;
+  }
+  var group = document.createElement('optgroup');
+  group.label = '── 自定义 ──';
+  list.forEach(function(s) {
+    var opt = document.createElement('option');
+    opt.value = s.name; opt.textContent = s.name;
+    group.appendChild(opt);
+  });
+  sel.appendChild(group);
+  if (cur && CustomSubjects.exists(cur)) sel.value = cur;
+  document.getElementById('customSubjectHint').classList.add('show');
+}
+
+function updateAddSubjectBtn() {
+  var btn = document.getElementById('btnAddSubject');
+  if (!btn) return;
+  if (CustomSubjects._list.length >= SUBJECT_COLOR_POOL.length) {
+    btn.classList.add('limit');
+    btn.title = '最多添加' + SUBJECT_COLOR_POOL.length + '个自定义科目';
+  } else {
+    btn.classList.remove('limit');
+    btn.title = '添加自定义科目';
+  }
+}
+
+function showSubjectInput() {
+  if (CustomSubjects._list.length >= SUBJECT_COLOR_POOL.length) {
+    showToast('最多添加' + SUBJECT_COLOR_POOL.length + '个自定义科目');
+    return;
+  }
+  document.getElementById('subjectInputDialog').classList.add('show');
+  document.getElementById('sdInput').value = '';
+  document.getElementById('sdError').textContent = '';
+  document.getElementById('sdInput').focus();
+}
+
+function hideSubjectInput() {
+  document.getElementById('subjectInputDialog').classList.remove('show');
+}
+
+function confirmAddSubject() {
+  var name = document.getElementById('sdInput').value;
+  var r = CustomSubjects.add(name);
+  if (!r.ok) { document.getElementById('sdError').textContent = r.error; return; }
+  hideSubjectInput();
+  document.getElementById('subjectSelect').value = r.name;
+  updateAddSubjectBtn();
+  repopulateSubjectSelect();
+  render();
+  showToast('已添加「' + r.name + '」');
+}
+
+function showSubjectDelete(name) {
+  if (!CustomSubjects.isDeletable(name)) return;
+  _subjectToDelete = name;
+  document.getElementById('sdDeleteMsg').textContent = '确定删除自定义科目「' + name + '」吗？已有该科目的作业将一并删除。';
+  var uf = AppState.tasks.filter(function(t) { return t.subject === name && t.status !== 'done'; });
+  document.getElementById('sdDeleteWarning').textContent = uf.length > 0 ? '该科目有' + uf.length + '项未完成作业，删除后无法恢复' : '';
+  document.getElementById('subjectDeleteDialog').classList.add('show');
+}
+
+function hideSubjectDelete() {
+  _subjectToDelete = null;
+  document.getElementById('subjectDeleteDialog').classList.remove('show');
+}
+
+function confirmDeleteSubject() {
+  if (!_subjectToDelete) return;
+  var name = _subjectToDelete;
+  AppState.tasks = AppState.tasks.filter(function(t) { return t.subject !== name; });
+  var sel = document.getElementById('subjectSelect');
+  if (sel.value === name) sel.value = '语文';
+  CustomSubjects.remove(name);
+  AppState.save();
+  _subjectToDelete = null;
+  hideSubjectDelete();
+  repopulateSubjectSelect();
+  updateAddSubjectBtn();
+  render();
+  showToast('已删除「' + name + '」');
+}
+
+function setupSubjectLongPress() {
+  var sel = document.getElementById('subjectSelect');
+  if (!sel) return;
+  var timer = null;
+  function startCheck() {
+    var opt = sel.options[sel.selectedIndex];
+    if (opt && CustomSubjects.isDeletable(opt.value)) {
+      timer = setTimeout(function() { showSubjectDelete(opt.value); }, 800);
+    }
+  }
+  function cancel() { clearTimeout(timer); }
+  sel.addEventListener('touchstart', startCheck);
+  sel.addEventListener('touchend', cancel);
+  sel.addEventListener('touchmove', cancel);
+  sel.addEventListener('contextmenu', function(e) {
+    var opt = sel.options[sel.selectedIndex];
+    if (opt && CustomSubjects.isDeletable(opt.value)) { e.preventDefault(); showSubjectDelete(opt.value); }
+  });
 }
 
 /* ==================================================================
@@ -2263,6 +2521,12 @@ window.addEventListener('beforeunload', function() {
    Init
    ================================================================== */
 (function init() {
+  // 加载自定义科目
+  CustomSubjects.load();
+  repopulateSubjectSelect();
+  updateAddSubjectBtn();
+  setupSubjectLongPress();
+
   var result = AppState.load();
 
   if (AppState._pendingRecovery) {

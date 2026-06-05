@@ -79,6 +79,7 @@
      头部 — 手绘标题
      ============================================================ */
   .header {
+    position: relative;
     text-align: center;
     padding: 10px 0 0;
     position: relative;
@@ -1116,6 +1117,144 @@
   }
   .custom-subject-hint.show { display: block; }
 
+  /* 关于按钮 */
+  .btn-about {
+    position: absolute; top: 6px; right: 4px;
+    width: 32px; height: 32px;
+    border: 1.5px dashed var(--ink-faint);
+    border-radius: 50%;
+    background: #fffef9;
+    color: var(--ink-light);
+    font-family: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    touch-action: manipulation;
+    z-index: 5;
+  }
+  .btn-about:active { background: #fef8f0; border-color: #c9a87c; transform: scale(0.9); }
+
+  /* 关于弹窗 */
+  .about-mask {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 1100;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .about-mask.show { display: flex; }
+  .about-modal {
+    background: #fffef9;
+    border-radius: 24px 8px 24px 8px;
+    border: 2.5px solid var(--ink-faint);
+    padding: 0;
+    width: 100%;
+    max-width: 90vw;
+    box-shadow: 4px 6px 0 -1px rgba(0,0,0,0.08);
+    margin: 0 auto;
+    overflow: hidden;
+    animation: pop-in 0.25s ease-out;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .about-modal .am-header {
+    padding: 16px 18px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .about-modal .am-header h3 {
+    font-size: 17px; font-weight: 700; letter-spacing: 1px; color: var(--ink);
+  }
+  .about-modal .btn-am-close {
+    width: 32px; height: 32px;
+    border: 1.5px dashed var(--ink-faint);
+    border-radius: 50%;
+    background: #fffef9;
+    color: var(--ink-light);
+    font-family: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .about-modal .btn-am-close:active { background: #fff0f0; border-color: #f0c8c8; }
+
+  /* 标签页 */
+  .am-tabs {
+    display: flex;
+    border-bottom: 2px dashed var(--ink-faint);
+    padding: 0 18px;
+    gap: 4px;
+    margin-top: 12px;
+    flex-shrink: 0;
+  }
+  .am-tab {
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    border: none;
+    background: none;
+    color: var(--ink-light);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+  }
+  .am-tab.active {
+    color: #e08850;
+    border-bottom-color: #e08850;
+  }
+
+  /* 内容区 */
+  .am-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--ink);
+    letter-spacing: 0.5px;
+  }
+  .am-body h4 {
+    font-size: 14px; font-weight: 700; color: #e08850;
+    margin: 12px 0 6px; letter-spacing: 1px;
+  }
+  .am-body h4:first-child { margin-top: 0; }
+  .am-body p, .am-body li { color: #5a5048; }
+  .am-body ul, .am-body ol { padding-left: 18px; margin: 4px 0; }
+  .am-body li { margin-bottom: 4px; }
+  .am-panel { display: none; }
+  .am-panel.active { display: block; }
+
+  /* Footer */
+  .app-footer {
+    text-align: center;
+    font-size: 10px;
+    color: var(--ink-faint);
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+    padding: 10px 20px;
+    margin-top: 4px;
+  }
+  .app-footer a {
+    color: #6b8ac9;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .app-footer a:active { color: #4058a0; }
+
   /* ============================================================
      响应式适配
      ============================================================ */
@@ -1182,6 +1321,7 @@
 
   <!-- ====== 头部 ====== -->
   <div class="header">
+    <button class="btn-about" onclick="openAbout()" title="关于">ℹ</button>
     <h1>今日作业打卡</h1>
     <div class="date" id="headerDate"></div>
   </div>
@@ -1259,7 +1399,60 @@
   </div>
 
   <div class="doodle-row">⁕ ✦ ⁕ ✿ ⁕</div>
-  <div class="version-footer">V26.5.8</div>
+  <div class="version-footer">V26.5.9</div>
+  <div class="app-footer">
+    © 2026 作业小管家 | 所有数据仅保存在您的设备中，我们不收集任何信息 |
+    <a onclick="openAbout()">免责声明</a>
+  </div>
+</div>
+
+<!-- ====== 关于弹窗 ====== -->
+<div class="about-mask" id="aboutMask" onclick="closeAbout(event)">
+  <div class="about-modal" onclick="event.stopPropagation()">
+    <div class="am-header">
+      <h3>作业小管家</h3>
+      <button class="btn-am-close" onclick="closeAbout()">×</button>
+    </div>
+    <div class="am-tabs">
+      <button class="am-tab active" data-am-tab="0" onclick="switchAboutTab(0)">使用说明</button>
+      <button class="am-tab" data-am-tab="1" onclick="switchAboutTab(1)">隐私说明</button>
+      <button class="am-tab" data-am-tab="2" onclick="switchAboutTab(2)">免责声明</button>
+    </div>
+    <div class="am-body">
+      <div class="am-panel active" data-am-panel="0">
+        <h4>怎么使用？</h4>
+        <ol>
+          <li>选择科目，输入作业内容，点击添加</li>
+          <li>点击「开始」计时，完成后点击「完成」</li>
+          <li>每完成一项休息 5 分钟，完成一科额外奖励 5 分钟</li>
+          <li>全部完成后自动生成学习报告</li>
+          <li>下次打开网页自动恢复上次未完成作业</li>
+          <li>长按自定义科目可删除</li>
+        </ol>
+        <p style="margin-top:8px;font-size:11px;color:var(--ink-light);">自定义科目仅保存在当前设备浏览器中。</p>
+      </div>
+      <div class="am-panel" data-am-panel="1">
+        <h4>你的数据安全吗？</h4>
+        <ul>
+          <li>本工具为<strong>纯静态网页</strong>，无服务器、无数据库</li>
+          <li><strong>不收集</strong>任何个人信息</li>
+          <li><strong>不使用</strong>任何追踪技术（无 Cookie、无埋点）</li>
+          <li>所有数据仅存储在<strong>您的设备本地</strong>（浏览器 localStorage）</li>
+          <li>适合家长陪同孩子使用，无任何外部通信</li>
+        </ul>
+      </div>
+      <div class="am-panel" data-am-panel="2">
+        <h4>需要注意什么？</h4>
+        <ul>
+          <li>数据<strong>仅保存在当前设备浏览器</strong>中</li>
+          <li>清除浏览器缓存、更换设备、使用隐私模式会导致<strong>数据丢失</strong></li>
+          <li>不对因上述原因导致的数据丢失承担任何责任</li>
+          <li>计时功能依赖设备系统时间，锁屏或后台可能导致计时偏差</li>
+          <li>本工具<strong>免费开源</strong>，仅供学习辅助使用，不构成任何教学承诺</li>
+        </ul>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ====== Toast ====== -->
@@ -2516,6 +2709,28 @@ window.addEventListener('beforeunload', function() {
   AppState.save();
   stopAutoSave();
 });
+
+/* ==================================================================
+   关于弹窗
+   ================================================================== */
+function openAbout() {
+  document.getElementById('aboutMask').classList.add('show');
+  switchAboutTab(0);
+}
+
+function closeAbout(e) {
+  if (e && e.target !== document.getElementById('aboutMask')) return;
+  document.getElementById('aboutMask').classList.remove('show');
+}
+
+function switchAboutTab(idx) {
+  // 更新标签
+  var tabs = document.querySelectorAll('.am-tab');
+  tabs.forEach(function(t, i) { t.classList.toggle('active', i === idx); });
+  // 更新面板
+  var panels = document.querySelectorAll('.am-panel');
+  panels.forEach(function(p, i) { p.classList.toggle('active', i === idx); });
+}
 
 /* ==================================================================
    Init
